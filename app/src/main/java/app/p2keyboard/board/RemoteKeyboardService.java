@@ -1,9 +1,10 @@
 package app.p2keyboard.board;
 
+import android.content.SharedPreferences;
 import android.inputmethodservice.InputMethodService;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.KeyEvent;
+import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -13,94 +14,173 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import app.p2keyboard.R;
-import app.p2keyboard.core.NetUtil;
-import app.p2keyboard.core.PairingServer;
+import app.p2keyboard.core.BoardSession;
+import app.p2keyboard.core.DerpMap;
+import app.p2keyboard.core.NaclBox;
+import app.p2keyboard.core.RemoteOps;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.security.SecureRandom;
+import java.util.Base64;
 
 /**
- * The board-side keyboard. It has no keys: it shows a pairing QR code and applies whatever the
- * paired phone sends to the focused text field.
+ * The board's keyboard. It has no keys: it shows a pairing QR code and replays the paired
+ * phone's keyboard operations (commit, compose, delete, key events, editor actions) on the
+ * focused text field. The link runs over Tailscale's public DERP relays.
  */
-public class RemoteKeyboardService extends InputMethodService implements PairingServer.Listener {
+public class RemoteKeyboardService extends InputMethodService implements BoardSession.Listener {
+
+    private static final String PREFS = "board";
 
     private final Handler main = new Handler(Looper.getMainLooper());
-    private PairingServer server;
-    private String serverError;
-    private byte[] page;
-
-    private View root, pairPanel;
-    private ImageView qr;
-    private TextView url, steps, connectedBar;
+    private BoardSession session;
+    private boolean relayOnline;
     private boolean phoneConnected;
-    private boolean fieldFocused;
+    private EditorInfo editor;
+
+    private View root, pairPanel, connectedPanel;
+    private ImageView qr;
+    private TextView status, relay;
+
+    // ---- lifecycle ------------------------------------------------------------------------------
 
     @Override
     public void onCreate() {
         super.onCreate();
-        try {
-            server = new PairingServer(this::loadPage, this);
-            server.start();
-        } catch (IOException e) {
-            serverError = e.getMessage();
-        }
+        startSession(false);
     }
 
     @Override
     public void onDestroy() {
-        if (server != null) server.stop();
+        if (session != null) session.stop();
+        main.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
+
+    /** Starts the relay session; with {@code newCode} it also rotates the secret and re-picks the relay. */
+    private void startSession(boolean newCode) {
+        SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String key = p.getString("key", null);
+        if (key == null) {
+            key = NaclBox.hex(NaclBox.newPrivateKey());
+            p.edit().putString("key", key).apply();
+        }
+        String secret = p.getString("secret", null);
+        if (secret == null || newCode) {
+            secret = newSecret();
+            p.edit().putString("secret", secret).apply();
+        }
+        String host = newCode ? null : p.getString("host", null);
+        final byte[] priv = NaclBox.unhex(key);
+        final String s = secret;
+        if (host != null) {
+            launch(host, priv, s);
+            return;
+        }
+        // First run (or new code): find the nearest Tailscale DERP region off the main thread.
+        new Thread(() -> {
+            String nearest = DerpMap.pickNearest();
+            p.edit().putString("host", nearest).apply();
+            main.post(() -> launch(nearest, priv, s));
+        }, "p2k-derpmap").start();
+    }
+
+    private void launch(String host, byte[] priv, String secret) {
+        if (session != null) session.stop();
+        relayOnline = false;
+        phoneConnected = false;
+        session = new BoardSession(host, priv, secret, this);
+        session.start();
+        refreshUi();
+    }
+
+    private static String newSecret() {
+        byte[] b = new byte[16];
+        new SecureRandom().nextBytes(b);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
+    }
+
+    // ---- input view -----------------------------------------------------------------------------
 
     @Override
     public View onCreateInputView() {
         root = LayoutInflater.from(this).inflate(R.layout.keyboard_view, null);
         pairPanel = root.findViewById(R.id.pair_panel);
+        connectedPanel = root.findViewById(R.id.connected_panel);
         qr = root.findViewById(R.id.qr);
-        url = root.findViewById(R.id.url);
-        steps = root.findViewById(R.id.steps);
-        connectedBar = root.findViewById(R.id.connected_bar);
-        root.findViewById(R.id.btn_new_code).setOnClickListener(v -> {
-            if (server != null) server.rotateToken();
-            refreshUi();
-        });
-        root.findViewById(R.id.btn_switch).setOnClickListener(v -> {
+        status = root.findViewById(R.id.status);
+        relay = root.findViewById(R.id.relay);
+        View.OnClickListener newCode = v -> startSession(true);
+        root.findViewById(R.id.btn_new_code).setOnClickListener(newCode);
+        root.findViewById(R.id.btn_unpair).setOnClickListener(newCode);
+        View.OnClickListener pick = v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
-        });
+        };
+        root.findViewById(R.id.btn_switch).setOnClickListener(pick);
+        root.findViewById(R.id.btn_switch2).setOnClickListener(pick);
+        root.findViewById(R.id.btn_hide).setOnClickListener(v -> requestHideSelf(0));
         refreshUi();
         return root;
     }
 
     @Override
+    public boolean onEvaluateFullscreenMode() {
+        return false;
+    }
+
+    @Override
     public void onStartInput(EditorInfo info, boolean restarting) {
         super.onStartInput(info, restarting);
-        fieldFocused = info != null && info.inputType != 0;
-        if (server != null) server.sendToPhone(fieldFocused ? "f:1" : "f:0");
+        editor = info;
+        sendEditorState();
     }
 
     @Override
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
-        refreshUi(); // the board's IP may have changed since last time
+        refreshUi();
     }
 
     @Override
     public void onFinishInput() {
         super.onFinishInput();
-        fieldFocused = false;
-        if (server != null) server.sendToPhone("f:0");
+        editor = null;
+        if (session != null) session.sendToPhone(RemoteOps.NO_FIELD);
     }
 
-    // ---- PairingServer.Listener (server threads -> main thread) --------------------------------
+    /** Tells the phone what kind of field is focused, plus the text before the cursor. */
+    private void sendEditorState() {
+        if (session == null || !phoneConnected) return;
+        EditorInfo ei = editor;
+        if (ei == null || ei.inputType == InputType.TYPE_NULL) {
+            session.sendToPhone(RemoteOps.NO_FIELD);
+            return;
+        }
+        session.sendToPhone(RemoteOps.editorInfo(ei.inputType, ei.imeOptions, ei.actionId,
+                ei.actionLabel == null ? "" : ei.actionLabel.toString()));
+        InputConnection ic = getCurrentInputConnection();
+        CharSequence before = ic == null ? null : ic.getTextBeforeCursor(RemoteOps.SEED_CHARS, 0);
+        boolean password = (ei.inputType & InputType.TYPE_MASK_VARIATION) == InputType.TYPE_TEXT_VARIATION_PASSWORD
+                || (ei.inputType & InputType.TYPE_MASK_VARIATION) == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+                || (ei.inputType & InputType.TYPE_MASK_VARIATION) == InputType.TYPE_NUMBER_VARIATION_PASSWORD;
+        session.sendToPhone(RemoteOps.seed(password || before == null ? "" : before.toString()));
+    }
+
+    // ---- BoardSession.Listener (network threads -> main thread) ---------------------------------
+
+    @Override
+    public void onRelayOnline(boolean online) {
+        main.post(() -> {
+            relayOnline = online;
+            refreshUi();
+        });
+    }
 
     @Override
     public void onPhoneConnected() {
         main.post(() -> {
             phoneConnected = true;
-            if (server != null) server.sendToPhone(fieldFocused ? "f:1" : "f:0");
+            sendEditorState();
             refreshUi();
         });
     }
@@ -114,106 +194,35 @@ public class RemoteKeyboardService extends InputMethodService implements Pairing
     }
 
     @Override
-    public void onEdit(int deleteBefore, String insert) {
-        main.post(() -> applyEdit(deleteBefore, insert));
-    }
-
-    @Override
-    public void onKey(String name) {
-        main.post(() -> applyKey(name));
-    }
-
-    // ---- Applying input -------------------------------------------------------------------------
-
-    private void applyEdit(int del, String insert) {
-        InputConnection ic = getCurrentInputConnection();
-        if (ic == null) return;
-        ic.beginBatchEdit();
-        try {
-            ic.finishComposingText();
-            CharSequence selected = ic.getSelectedText(0);
-            if (selected != null && selected.length() > 0 && del > 0) {
-                ic.commitText("", 1); // a backspace over a selection removes the selection
-                del--;
-            }
-            if (del > 0) ic.deleteSurroundingText(del, 0);
-            if (!insert.isEmpty()) ic.commitText(insert, 1);
-        } finally {
-            ic.endBatchEdit();
-        }
-    }
-
-    private void applyKey(String name) {
-        switch (name) {
-            case "enter": pressEnter(); break;
-            case "tab": sendDownUpKeyEvents(KeyEvent.KEYCODE_TAB); break;
-            case "del": sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL); break;
-            case "left": sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT); break;
-            case "right": sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT); break;
-            case "up": sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_UP); break;
-            case "down": sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_DOWN); break;
-            case "home": sendDownUpKeyEvents(KeyEvent.KEYCODE_MOVE_HOME); break;
-            case "end": sendDownUpKeyEvents(KeyEvent.KEYCODE_MOVE_END); break;
-            default: break;
-        }
-    }
-
-    private void pressEnter() {
-        EditorInfo ei = getCurrentInputEditorInfo();
-        InputConnection ic = getCurrentInputConnection();
-        if (ei == null || ic == null) return;
-        int action = ei.imeOptions & EditorInfo.IME_MASK_ACTION;
-        boolean multiLine = (ei.inputType & android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0;
-        boolean noEnterAction = (ei.imeOptions & EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0;
-        if (!multiLine && !noEnterAction
-                && action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
-            ic.performEditorAction(action);
-        } else {
-            sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER);
-        }
+    public void onOp(String op) {
+        main.post(() -> OpApplier.apply(getCurrentInputConnection(), op));
     }
 
     // ---- UI -------------------------------------------------------------------------------------
 
     private void refreshUi() {
         if (root == null) return;
-        connectedBar.setVisibility(phoneConnected ? View.VISIBLE : View.GONE);
         pairPanel.setVisibility(phoneConnected ? View.GONE : View.VISIBLE);
+        connectedPanel.setVisibility(phoneConnected ? View.VISIBLE : View.GONE);
         if (phoneConnected) return;
 
-        if (server == null || server.getPort() < 0) {
+        if (session == null) {
             qr.setImageDrawable(null);
-            steps.setText("Could not start the pairing server: " + serverError);
-            url.setText("");
+            status.setText(R.string.finding_relay);
+            relay.setText("");
             return;
         }
-        String ip = NetUtil.lanAddress();
-        if (ip == null) {
-            qr.setImageDrawable(null);
-            steps.setText(R.string.no_network);
-            url.setText("");
-            return;
+        String host = session.pairing().host;
+        relay.setText(getString(R.string.relay_line, host));
+        if (!relayOnline) {
+            status.setText(R.string.connecting_relay);
+        } else {
+            status.setText(R.string.pair_steps);
         }
-        steps.setText(R.string.pair_steps);
-        String link = "http://" + ip + ":" + server.getPort() + "/?t=" + server.getToken();
-        url.setText("http://" + ip + ":" + server.getPort());
         try {
-            qr.setImageBitmap(QrCodes.render(link, 600));
+            qr.setImageBitmap(QrCodes.render(session.pairing().toUri(), 600));
         } catch (Exception e) {
             qr.setImageDrawable(null);
         }
-    }
-
-    private byte[] loadPage() throws IOException {
-        if (page == null) {
-            try (InputStream in = getAssets().open("remote.html")) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buf = new byte[4096];
-                int n;
-                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-                page = out.toByteArray();
-            }
-        }
-        return page;
     }
 }

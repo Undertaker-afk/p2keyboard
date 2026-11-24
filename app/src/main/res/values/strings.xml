@@ -1,19 +1,49 @@
 <resources>
     <string name="app_name">Phone Keyboard</string>
     <string name="ime_label">Phone Keyboard (pair with QR)</string>
-    <string name="pair_title">Type with your phone</string>
-    <string name="pair_steps">1. Join the same Wi-Fi as this board\n2. Scan the code with your phone camera\n3. Open the link and type on your phone</string>
-    <string name="no_network">This board has no Wi-Fi/LAN address. Connect it to the same network as your phone.</string>
-    <string name="connected">Phone connected - type on your phone</string>
-    <string name="disconnect">Unpair</string>
-    <string name="new_code">New code</string>
-    <string name="switch_kb">Switch keyboard</string>
-    <string name="setup_title">Phone Keyboard setup</string>
-    <string name="setup_intro">Use your phone\'s keyboard to type on this board. Nothing to install on the phone: it just scans a QR code.</string>
+
+    <!-- launcher -->
+    <string name="setup_intro">Install this same app on the smart board and on your phone. The phone types with PixelBoard; the text appears on the board.</string>
+    <string name="role_phone">On your phone</string>
+    <string name="role_phone_desc">Scan the QR code the board shows, then type.</string>
+    <string name="open_phone">Open phone keyboard</string>
+    <string name="role_board">On the smart board</string>
+    <string name="role_board_desc">Enable Phone Keyboard and select it. Tapping any text box then shows a QR code instead of the on-screen keyboard.</string>
     <string name="step_enable">1. Enable keyboard</string>
     <string name="step_select">2. Select keyboard</string>
-    <string name="status_off">Not enabled yet</string>
-    <string name="status_enabled">Enabled - now select it as the active keyboard</string>
-    <string name="status_active">Active - tap the box below to see the QR code</string>
+    <string name="status_off">Not enabled on this device</string>
+    <string name="status_enabled">Enabled: now select it as the active keyboard</string>
+    <string name="status_active">Active: tap the box below to see the QR code</string>
     <string name="test_hint">Tap here to test</string>
+
+    <!-- board keyboard -->
+    <string name="pair_title">Type with your phone</string>
+    <string name="pair_steps">Open Phone Keyboard on your phone and tap Scan (or scan this with the camera).</string>
+    <string name="finding_relay">Finding the nearest Tailscale relay…</string>
+    <string name="connecting_relay">Connecting to the relay…</string>
+    <string name="relay_line">Relay: %1$s (Tailscale DERP, end-to-end encrypted)</string>
+    <string name="connected">Phone connected: type on your phone</string>
+    <string name="new_code">New code</string>
+    <string name="unpair">Unpair</string>
+    <string name="hide">Hide</string>
+    <string name="switch_kb">Switch keyboard</string>
+    <string name="qr_desc">Pairing QR code</string>
+
+    <!-- phone -->
+    <string name="scan">Scan board</string>
+    <string name="scan_prompt">Scan the QR code on the smart board</string>
+    <string name="not_a_board_code">That is not a Phone Keyboard pairing code.</string>
+    <string name="phone_not_paired">Not paired: tap Scan board</string>
+    <string name="phone_connecting_relay">Connecting to relay %1$s…</string>
+    <string name="phone_waiting_board">Waiting for the board…</string>
+    <string name="phone_connected">Connected: typing goes to the board</string>
+    <string name="phone_no_field">Connected: tap a text box on the board</string>
+    <string name="phone_rejected">Code expired: scan the board again</string>
+    <string name="mirror_hint">Tap here and type. Your text goes to the board.</string>
+    <string name="pb_not_installed">PixelBoard is not installed. It is the keyboard this app types with.</string>
+    <string name="pb_not_enabled">PixelBoard is installed but not enabled.</string>
+    <string name="pb_not_selected">Switch to PixelBoard to type.</string>
+    <string name="pb_get">Get PixelBoard</string>
+    <string name="pb_enable">Enable</string>
+    <string name="pb_select">Switch</string>
 </resources>

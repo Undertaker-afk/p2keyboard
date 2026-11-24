@@ -1,0 +1,57 @@
+package app.p2keyboard.core;
+
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+
+/**
+ * What the board's QR code carries: {@code p2k://pair?k=<board public key>&h=<DERP host>&s=<secret>}.
+ * The phone connects to the same DERP server, addresses the board by its public key and proves
+ * it scanned the code by sending the secret (encrypted end-to-end).
+ */
+public final class Pairing {
+    public final byte[] boardKey;
+    public final String host;
+    public final String secret;
+
+    public Pairing(byte[] boardKey, String host, String secret) {
+        this.boardKey = boardKey;
+        this.host = host;
+        this.secret = secret;
+    }
+
+    public String toUri() {
+        return "p2k://pair?k=" + NaclBox.hex(boardKey) + "&h=" + host + "&s=" + secret;
+    }
+
+    /** Returns null if the text is not a valid pairing code. */
+    public static Pairing parse(String text) {
+        if (text == null) return null;
+        try {
+            URI uri = new URI(text.trim());
+            if (!"p2k".equals(uri.getScheme()) || !"pair".equals(uri.getHost())) return null;
+            String k = null, h = null, s = null;
+            String q = uri.getRawQuery();
+            if (q == null) return null;
+            for (String pair : q.split("&")) {
+                int eq = pair.indexOf('=');
+                if (eq <= 0) continue;
+                String v = URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8.name());
+                switch (pair.substring(0, eq)) {
+                    case "k": k = v; break;
+                    case "h": h = v; break;
+                    case "s": s = v; break;
+                    default: break;
+                }
+            }
+            if (k == null || h == null || s == null) return null;
+            if (!h.matches("[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+")) return null;
+            if (!s.matches("[A-Za-z0-9_-]{16,64}")) return null;
+            byte[] key = NaclBox.unhex(k);
+            if (key.length != 32) return null;
+            return new Pairing(key, h, s);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+}

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#101418"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_scan"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/scan" />
+    </LinearLayout>
+
+    <!-- Shown until PixelBoard is the active keyboard -->
+    <LinearLayout
+        android:id="@+id/kb_banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="#2A2F1A"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/kb_note"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#F0E6B4"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/kb_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <!-- What the board's field holds around the cursor (as far as the phone knows) -->
+    <TextView
+        android:id="@+id/mirror"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="10dp"
+        android:layout_weight="1"
+        android:background="#1A2027"
+        android:gravity="bottom|start"
+        android:hint="@string/mirror_hint"
+        android:padding="14dp"
+        android:textColor="#E8EDF2"
+        android:textColorHint="#8D99A6"
+        android:textSize="20sp" />
+
+    <!-- The focus target the keyboard actually types into -->
+    <app.p2keyboard.phone.RemoteInputView
+        android:id="@+id/remote_input"
+        android:layout_width="match_parent"
+        android:layout_height="1dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <Button android:id="@+id/k_tab" style="@style/Key" android:text="Tab" />
+        <Button android:id="@+id/k_esc" style="@style/Key" android:text="Esc" />
+        <Button android:id="@+id/k_left" style="@style/Key" android:text="←" />
+        <Button android:id="@+id/k_up" style="@style/Key" android:text="↑" />
+        <Button android:id="@+id/k_down" style="@style/Key" android:text="↓" />
+        <Button android:id="@+id/k_right" style="@style/Key" android:text="→" />
+    </LinearLayout>
+</LinearLayout>
