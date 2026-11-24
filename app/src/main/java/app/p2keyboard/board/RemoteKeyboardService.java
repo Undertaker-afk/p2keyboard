@@ -185,6 +185,14 @@ public class RemoteKeyboardService extends InputMethodService implements BoardLi
     }
 
     private void sendPreview() {
+        try {
+            sendPreviewUnsafe();
+        } catch (RuntimeException e) {
+            // Some apps' text fields throw from getTextBeforeCursor; the preview is optional.
+        }
+    }
+
+    private void sendPreviewUnsafe() {
         BoardLinkService l = link();
         InputConnection ic = getCurrentInputConnection();
         EditorInfo ei = editor;

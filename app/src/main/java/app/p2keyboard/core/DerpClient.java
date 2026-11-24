@@ -49,6 +49,16 @@ public final class DerpClient implements Closeable {
     private static final int MAX_FRAME = 1 << 20;
     public static final int MAX_PACKET = 64 << 10;
 
+    /**
+     * Thread that must never write to the network (Android's main thread does this check itself
+     * and kills the app). Tests set it to prove sends are handed off to the link's sender thread.
+     */
+    static volatile Thread noNetworkThread;
+
+    public static void forbidNetworkOn(Thread t) {
+        noNetworkThread = t;
+    }
+
     private final Socket socket;
     private final DataInputStream in;
     private final OutputStream out;
@@ -180,6 +190,9 @@ public final class DerpClient implements Closeable {
     }
 
     private synchronized void writeFrame(int type, byte[] body) throws IOException {
+        if (Thread.currentThread() == noNetworkThread) {
+            throw new IllegalStateException("network write on a UI thread");
+        }
         out.write(type);
         out.write(body.length >>> 24);
         out.write(body.length >>> 16);

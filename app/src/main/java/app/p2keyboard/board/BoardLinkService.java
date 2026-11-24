@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.util.Log;
 
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -47,6 +48,7 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
     public static final String ACTION_NEW_CODE = "app.p2keyboard.NEW_CODE";
     public static final String ACTION_DISCONNECT = "app.p2keyboard.DISCONNECT";
     static final String PREFS = "board";
+    private static final String TAG = "p2k-board";
     private static final String CHANNEL = "link";
     private static final int NOTIFICATION_ID = 1;
 
@@ -290,8 +292,12 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
     @Override
     public void onOp(String op) {
         main.post(() -> {
-            if (ime != null) ime.onOp(op);
-            else if (session != null) session.sendToPhone(RemoteOps.NO_FIELD); // board keyboard not active
+            try {
+                if (ime != null) ime.onOp(op);
+                else if (session != null) session.sendToPhone(RemoteOps.NO_FIELD); // board keyboard not active
+            } catch (RuntimeException e) {
+                Log.w(TAG, "could not apply a keystroke", e); // never let one keystroke take the keyboard down
+            }
         });
     }
 

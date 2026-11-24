@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -36,6 +38,12 @@ public final class SecureLink {
     private final AtomicLong seq = new AtomicLong(System.currentTimeMillis() * 1000);
     private final ScheduledExecutorService keepAlive = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "p2k-keepalive");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private final ExecutorService sender = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "p2k-send");
         t.setDaemon(true);
         return t;
     });
@@ -86,15 +94,38 @@ public final class SecureLink {
     public synchronized void stop() {
         running = false;
         keepAlive.shutdownNow();
-        DerpClient c = client;
-        if (c != null) c.close();
+        try {
+            // Closing writes to the socket too, so it happens on the sender thread, after
+            // anything already queued (e.g. a "bye").
+            sender.execute(() -> {
+                DerpClient c = client;
+                if (c != null) c.close();
+            });
+        } catch (RejectedExecutionException ignored) {
+        }
+        sender.shutdown();
         if (loop != null) loop.interrupt();
     }
 
-    /** Encrypts and sends; returns false if the relay is currently unreachable. */
+    /**
+     * Queues an encrypted message for the peer and returns at once; false if the relay is
+     * currently unreachable. Safe to call from Android's main thread: the socket write happens on
+     * the link's own sender thread (Android kills apps that touch the network on the main thread),
+     * and one sender thread keeps messages in order.
+     */
     public boolean send(byte[] peer, String message) {
+        if (client == null) return false;
+        try {
+            sender.execute(() -> sendNow(peer, message));
+            return true;
+        } catch (RejectedExecutionException e) {
+            return false; // stopped
+        }
+    }
+
+    private void sendNow(byte[] peer, String message) {
         DerpClient c = client;
-        if (c == null) return false;
+        if (c == null) return;
         byte[] nonce = NaclBox.randomNonce();
         String framed = seq.incrementAndGet() + "|" + message;
         byte[] sealed = NaclBox.seal(framed.getBytes(StandardCharsets.UTF_8), nonce, shared(peer));
@@ -104,10 +135,8 @@ public final class SecureLink {
         System.arraycopy(sealed, 0, packet, HEADER.length + nonce.length, sealed.length);
         try {
             c.sendPacket(peer, packet);
-            return true;
-        } catch (IOException e) {
-            c.close();
-            return false;
+        } catch (IOException | RuntimeException e) {
+            c.close(); // the read loop notices and reconnects
         }
     }
 
