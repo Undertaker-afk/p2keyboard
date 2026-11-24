@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">Phone Keyboard</string>
+    <string name="ime_label">Phone Keyboard (pair with QR)</string>
+    <string name="pair_title">Type with your phone</string>
+    <string name="pair_steps">1. Join the same Wi-Fi as this board\n2. Scan the code with your phone camera\n3. Open the link and type on your phone</string>
+    <string name="no_network">This board has no Wi-Fi/LAN address. Connect it to the same network as your phone.</string>
+    <string name="connected">Phone connected - type on your phone</string>
+    <string name="disconnect">Unpair</string>
+    <string name="new_code">New code</string>
+    <string name="switch_kb">Switch keyboard</string>
+    <string name="setup_title">Phone Keyboard setup</string>
+    <string name="setup_intro">Use your phone\'s keyboard to type on this board. Nothing to install on the phone: it just scans a QR code.</string>
+    <string name="step_enable">1. Enable keyboard</string>
+    <string name="step_select">2. Select keyboard</string>
+    <string name="status_off">Not enabled yet</string>
+    <string name="status_enabled">Enabled - now select it as the active keyboard</string>
+    <string name="status_active">Active - tap the box below to see the QR code</string>
+    <string name="test_hint">Tap here to test</string>
+</resources>
