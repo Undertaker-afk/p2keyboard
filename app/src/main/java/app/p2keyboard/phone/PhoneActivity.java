@@ -4,9 +4,7 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.KeyEvent;
@@ -15,46 +13,55 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.google.zxing.integration.android.IntentIntegrator;
-import com.google.zxing.integration.android.IntentResult;
-
+import app.p2keyboard.Identity;
+import app.p2keyboard.MainActivity;
 import app.p2keyboard.R;
-import app.p2keyboard.core.NaclBox;
 import app.p2keyboard.core.Pairing;
 import app.p2keyboard.core.PhoneSession;
 import app.p2keyboard.core.RemoteOps;
 
 /**
- * Phone screen: locked to landscape, full screen, with the app's own on-screen keyboard. Every key
- * goes straight to the board over the DERP link; the line above the keys shows what the board's
- * text box actually holds.
+ * Keyboard screen for one paired device: locked to landscape, full screen, with the app's own
+ * on-screen keyboard. Every key goes straight to the board over the DERP link; the line above the
+ * keys shows what the board's text box actually holds.
  */
 public class PhoneActivity extends Activity implements PhoneSession.Listener, KeyboardView.Listener {
 
-    private static final String PREFS = "phone";
+    public static final String EXTRA_BOARD = "board"; // board key (hex) from PairedBoards
     private static final int MAX_PASTE = 5000;
 
+    private PairedBoards boards;
+    private String boardKey;
     private PhoneSession session;
     private KeyboardView keyboard;
     private TextView status, preview;
+    private Button action;
     private boolean boardHasField = true;
-    private String relayHost = "";
+    private String boardLabel = "";
     private String boardText = "";
+
+    /** Opens the keyboard connected to a paired board. */
+    public static void open(Activity from, String boardKeyHex) {
+        from.startActivity(new Intent(from, PhoneActivity.class).putExtra(EXTRA_BOARD, boardKeyHex)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_phone);
+        boards = new PairedBoards(this);
         keyboard = findViewById(R.id.keyboard);
         status = findViewById(R.id.status);
         preview = findViewById(R.id.preview);
+        action = findViewById(R.id.btn_action);
         keyboard.setListener(this);
-        findViewById(R.id.btn_scan).setOnClickListener(v -> scan());
-        acceptPairingFrom(getIntent());
+        findViewById(R.id.btn_devices).setOnClickListener(v -> finish());
+        boardKey = getIntent().getStringExtra(EXTRA_BOARD);
     }
 
     @Override
@@ -83,13 +90,17 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Ke
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        if (acceptPairingFrom(intent)) restartSession();
+        String key = intent.getStringExtra(EXTRA_BOARD);
+        if (key != null && !key.equals(boardKey)) {
+            boardKey = key;
+            connect();
+        }
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        restartSession();
+        connect();
     }
 
     @Override
@@ -99,78 +110,43 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Ke
         super.onStop();
     }
 
-    // ---- pairing --------------------------------------------------------------------------------
+    // ---- connecting -----------------------------------------------------------------------------
 
-    /** A board QR scanned with the stock camera opens p2k://pair?... straight into this screen. */
-    private boolean acceptPairingFrom(Intent intent) {
-        Uri data = intent == null ? null : intent.getData();
-        return data != null && savePairing(data.toString());
-    }
-
-    private boolean savePairing(String text) {
-        Pairing p = Pairing.parse(text);
-        if (p == null) {
-            Toast.makeText(this, R.string.not_a_board_code, Toast.LENGTH_LONG).show();
-            return false;
-        }
-        prefs().edit().putString("pairing", p.toUri()).apply();
-        return true;
-    }
-
-    private void scan() {
-        new IntentIntegrator(this)
-                .setPrompt(getString(R.string.scan_prompt))
-                .setBeepEnabled(false)
-                .setOrientationLocked(false)
-                .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
-                .initiateScan();
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        IntentResult r = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
-        if (r != null) {
-            if (r.getContents() != null && savePairing(r.getContents())) restartSession();
-            return;
-        }
-        super.onActivityResult(requestCode, resultCode, data);
-    }
-
-    private void restartSession() {
+    private void connect() {
         if (session != null) session.stop();
         session = null;
         boardText = "";
         renderPreview();
-        Pairing p = Pairing.parse(prefs().getString("pairing", null));
-        if (p == null) {
-            setStatus(getString(R.string.phone_not_paired), Color.parseColor("#F0B429"));
-            keyboard.setKeysEnabled(false);
+        Pairing p = boardKey == null ? null : boards.find(boardKey);
+        if (p == null) { // removed meanwhile: back to the device list
+            finish();
             return;
         }
-        relayHost = p.host;
-        session = new PhoneSession(p, phoneKey(), this);
+        boardLabel = (p.name.isEmpty() ? getString(R.string.unnamed_board) : p.name);
+        session = new PhoneSession(p, Identity.privateKey(this), Identity.name(this), this);
         renderStatus();
         session.start();
-    }
-
-    private byte[] phoneKey() {
-        String k = prefs().getString("key", null);
-        if (k == null) {
-            k = NaclBox.hex(NaclBox.newPrivateKey());
-            prefs().edit().putString("key", k).apply();
-        }
-        return NaclBox.unhex(k);
-    }
-
-    private SharedPreferences prefs() {
-        return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
     // ---- PhoneSession.Listener (network threads) ------------------------------------------------
 
     @Override
     public void onStatus(PhoneSession.Status s) {
-        runOnUiThread(this::renderStatus);
+        runOnUiThread(() -> {
+            if (s == PhoneSession.Status.CONNECTED && boardKey != null) {
+                boards.markPaired(boardKey, null); // paired: the one-time code is no longer needed
+            }
+            renderStatus();
+        });
+    }
+
+    @Override
+    public void onBoardName(String name) {
+        runOnUiThread(() -> {
+            if (boardKey != null) boards.markPaired(boardKey, name);
+            if (!name.isEmpty()) boardLabel = name;
+            renderStatus();
+        });
     }
 
     @Override
@@ -217,19 +193,33 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Ke
         if (s == null) return;
         boolean connected = s.status() == PhoneSession.Status.CONNECTED;
         keyboard.setKeysEnabled(connected);
+        action.setVisibility(View.GONE);
+        String who = boardLabel;
         switch (s.status()) {
             case CONNECTING_RELAY:
-                setStatus(getString(R.string.phone_connecting_relay, relayHost), Color.parseColor("#F0B429"));
+                setStatus(getString(R.string.phone_connecting, who), Color.parseColor("#F0B429"));
                 break;
             case WAITING_FOR_BOARD:
-                setStatus(getString(R.string.phone_waiting_board), Color.parseColor("#F0B429"));
+                setStatus(getString(R.string.phone_waiting_board, who), Color.parseColor("#F0B429"));
                 break;
             case CONNECTED:
-                setStatus(getString(boardHasField ? R.string.phone_connected : R.string.phone_no_field),
+                setStatus(getString(boardHasField ? R.string.phone_connected : R.string.phone_no_field, who),
                         Color.parseColor(boardHasField ? "#35C46A" : "#F0B429"));
                 break;
-            case REJECTED:
-                setStatus(getString(R.string.phone_rejected), Color.parseColor("#EF5350"));
+            case DISCONNECTED:
+                setStatus(getString(R.string.phone_disconnected, who), Color.parseColor("#F0B429"));
+                action.setText(R.string.reconnect);
+                action.setOnClickListener(v -> connect());
+                action.setVisibility(View.VISIBLE);
+                break;
+            case NOT_PAIRED:
+                setStatus(getString(R.string.phone_not_paired, who), Color.parseColor("#EF5350"));
+                action.setText(R.string.pair_again);
+                action.setOnClickListener(v -> {
+                    MainActivity.startPairing(this);
+                    finish();
+                });
+                action.setVisibility(View.VISIBLE);
                 break;
         }
     }

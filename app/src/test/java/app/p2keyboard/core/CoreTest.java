@@ -2,7 +2,9 @@ package app.p2keyboard.core;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNull;
 
 import java.nio.charset.StandardCharsets;
@@ -45,6 +47,23 @@ public class CoreTest {
         assertNull(Pairing.parse("p2k://pair?k=00&h=derp1f.tailscale.com&s=abcdefghijklmnop"));
         assertNull(Pairing.parse(p.toUri().replace("derp4f.tailscale.com", "evil host")));
         assertNull(Pairing.parse(p.toUri().replace("abcdefghijklmnop0123", "short")));
+    }
+
+    @Test
+    public void pairingCarriesBoardNameAndDeviceIdIsStable() {
+        Pairing p = new Pairing(NaclBox.publicKey(ALICE_SK), "derp4f.tailscale.com", "abcdefghijklmnop0123", "Room 12 & Co");
+        Pairing q = Pairing.parse(p.toUri());
+        assertEquals("Room 12 & Co", q.name);
+        assertEquals(p.deviceId(), q.deviceId());
+        assertTrue(q.deviceId().matches("\\d{3} \\d{3} \\d{3}"));
+        assertEquals(DeviceId.of(NaclBox.publicKey(ALICE_SK)), DeviceId.of(NaclBox.publicKey(ALICE_SK)));
+        assertNotEquals(DeviceId.of(NaclBox.publicKey(ALICE_SK)), DeviceId.of(NaclBox.publicKey(BOB_SK)));
+        // names from the network are cleaned: one line, bounded length
+        assertEquals("a b", Pairing.cleanName("a\nb"));
+        assertEquals(40, Pairing.cleanName("x".repeat(100)).length());
+        // codes without a name (older boards) still parse
+        assertEquals("", Pairing.parse("p2k://pair?k=" + NaclBox.hex(NaclBox.publicKey(BOB_SK))
+                + "&h=derp1f.tailscale.com&s=abcdefghijklmnop").name);
     }
 
     @Test

@@ -85,10 +85,10 @@
         android:visibility="gone">
 
         <TextView
+            android:id="@+id/connected_text"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/connected"
             android:textColor="#35C46A"
             android:textSize="18sp"
             android:textStyle="bold" />
@@ -107,10 +107,10 @@
             android:text="@string/switch_kb" />
 
         <Button
-            android:id="@+id/btn_unpair"
+            android:id="@+id/btn_disconnect"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="@string/unpair" />
+            android:text="@string/disconnect" />
     </LinearLayout>
 </LinearLayout>

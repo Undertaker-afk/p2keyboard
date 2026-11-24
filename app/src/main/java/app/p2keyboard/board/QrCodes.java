@@ -13,10 +13,10 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import java.util.EnumMap;
 import java.util.Map;
 
-final class QrCodes {
+public final class QrCodes {
     private QrCodes() {}
 
-    static Bitmap render(String text, int sizePx) throws WriterException {
+    public static Bitmap render(String text, int sizePx) throws WriterException {
         Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
         hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
         hints.put(EncodeHintType.MARGIN, 0);

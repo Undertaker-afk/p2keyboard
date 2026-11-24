@@ -35,7 +35,7 @@ public class RemoteKeyboardService extends InputMethodService implements BoardLi
 
     private View root, pairPanel, connectedPanel;
     private ImageView qr;
-    private TextView status, relay;
+    private TextView status, relay, connectedText;
     private String shownQr;
 
     private final ServiceConnection connection = new ServiceConnection() {
@@ -84,13 +84,16 @@ public class RemoteKeyboardService extends InputMethodService implements BoardLi
         qr = root.findViewById(R.id.qr);
         status = root.findViewById(R.id.status);
         relay = root.findViewById(R.id.relay);
+        connectedText = root.findViewById(R.id.connected_text);
         shownQr = null;
-        View.OnClickListener newCode = v -> {
+        root.findViewById(R.id.btn_new_code).setOnClickListener(v -> {
             BoardLinkService l = link();
             if (l != null) l.newCode();
-        };
-        root.findViewById(R.id.btn_new_code).setOnClickListener(newCode);
-        root.findViewById(R.id.btn_unpair).setOnClickListener(newCode);
+        });
+        root.findViewById(R.id.btn_disconnect).setOnClickListener(v -> {
+            BoardLinkService l = link();
+            if (l != null) l.disconnectPhone();
+        });
         View.OnClickListener pick = v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
@@ -204,7 +207,10 @@ public class RemoteKeyboardService extends InputMethodService implements BoardLi
         boolean connected = l != null && l.isPhoneConnected();
         pairPanel.setVisibility(connected ? View.GONE : View.VISIBLE);
         connectedPanel.setVisibility(connected ? View.VISIBLE : View.GONE);
-        if (connected) return;
+        if (connected) {
+            connectedText.setText(getString(R.string.connected, l.connectedPhoneName()));
+            return;
+        }
 
         Pairing p = l == null ? null : l.pairing();
         if (p == null) {
@@ -214,7 +220,7 @@ public class RemoteKeyboardService extends InputMethodService implements BoardLi
             relay.setText("");
             return;
         }
-        relay.setText(getString(R.string.relay_line, p.host));
+        relay.setText(getString(R.string.board_line, p.name, p.deviceId(), p.host));
         status.setText(l.isRelayOnline() ? R.string.pair_steps : R.string.connecting_relay);
         String uri = p.toUri();
         if (!uri.equals(shownQr)) {

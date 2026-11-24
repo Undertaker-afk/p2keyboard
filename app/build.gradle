@@ -10,8 +10,8 @@ android {
         applicationId 'app.p2keyboard'
         minSdk 26
         targetSdk 34
-        versionCode 3
-        versionName '3.0'
+        versionCode 4
+        versionName '4.0'
     }
 
     buildTypes {
@@ -45,6 +45,8 @@ tasks.withType(Test).configureEach {
     }
     def png = System.getenv('KEYBOARD_PNG') // optional: KeyboardRelayTest renders the keyboard here
     if (png) systemProperty 'keyboardPng', png
+    def home = System.getenv('HOME_PNG') // optional: HomeScreenTest renders the home screen here
+    if (home) systemProperty 'homePng', home
 }
 
 dependencies {
@@ -54,4 +56,5 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'
     testImplementation 'org.robolectric:robolectric:4.13'
+    testImplementation 'androidx.test:core:1.6.1'
 }

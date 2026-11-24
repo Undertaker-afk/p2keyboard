@@ -41,16 +41,14 @@
             android:textSize="17sp" />
 
         <Button
-            android:id="@+id/btn_scan"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="@string/scan"
-            android:textAllCaps="false"
-            android:textSize="13sp" />
+            android:id="@+id/btn_action"
+            style="@style/BarButton"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btn_devices"
+            style="@style/BarButton"
+            android:text="@string/devices" />
     </LinearLayout>
 
     <!-- The app's own keyboard: fills the rest of the landscape screen -->

@@ -2,50 +2,78 @@
     <string name="app_name">Phone Keyboard</string>
     <string name="ime_label">Phone Keyboard (pair with QR)</string>
 
-    <!-- start screen -->
-    <string name="setup_intro">Install this same app on the smart board and on your phone. Type on the phone\'s keyboard; the text appears on the board.</string>
-    <string name="role_phone">On your phone</string>
-    <string name="role_phone_desc">Opens a full-screen keyboard in landscape. Scan the QR code the board shows, then type.</string>
-    <string name="open_phone">Open phone keyboard</string>
-    <string name="role_board">On the smart board</string>
-    <string name="role_board_desc">Enable Phone Keyboard, select it, and allow it to run in the background. Tapping any text box then shows a QR code instead of the on-screen keyboard.</string>
+    <!-- home -->
+    <string name="this_device">This device (tap to rename)</string>
+    <string name="device_id">ID %1$s</string>
+    <string name="pair_device">Pair device</string>
+    <string name="paired_devices">Paired devices</string>
+    <string name="paired_devices_hint">Tap a device to type on it. Long-press to remove it.</string>
+    <string name="no_devices">No paired devices yet. Tap Pair device and scan the QR code on a smart board.</string>
+    <string name="connect">Connect</string>
+    <string name="not_yet_connected">not connected yet</string>
+    <string name="remove">Remove</string>
+    <string name="remove_board_message">Remove this device from your list? To use it again you will need to scan its QR code.</string>
+    <string name="unnamed_board">Smart board</string>
+    <string name="unnamed_phone">Phone</string>
+    <string name="rename_title">Device name</string>
+    <string name="rename_message">Other devices see this name when you pair or connect.</string>
+    <string name="cant_pair_self">That is this device\'s own code. Scan it with your phone instead.</string>
+    <string name="camera_title">Camera access</string>
+    <string name="camera_needed">The camera is needed to scan the QR code on the board.</string>
+    <string name="camera_denied_forever">Camera access is turned off for Phone Keyboard. Allow it in the app settings to scan a board\'s QR code.</string>
+    <string name="open_settings">Open settings</string>
+    <string name="torch_on">Light on</string>
+    <string name="torch_off">Light off</string>
+
+    <!-- board setup -->
+    <string name="role_board">Use this device as a smart board</string>
+    <string name="role_board_desc">Enable Phone Keyboard, select it, and allow it to run in the background. Then phones can pair by scanning the code, and tapping any text box shows the code instead of the on-screen keyboard.</string>
     <string name="step_enable">1. Enable keyboard</string>
     <string name="step_select">2. Select keyboard</string>
     <string name="step_background">3. Allow background running</string>
     <string name="status_off">Keyboard: not enabled on this device</string>
     <string name="status_enabled">Keyboard: enabled, now select it as the active keyboard</string>
-    <string name="status_active">Keyboard: active. Tap the box below to see the QR code</string>
+    <string name="status_active">Keyboard: active</string>
     <string name="bg_off">Background: limited by battery optimization (tap step 3)</string>
     <string name="bg_on">Background: allowed</string>
     <string name="bg_on_running">Background: allowed, link running</string>
+    <string name="board_qr_ready">Scan this with Pair device on your phone. Paired phones can connect any time without it.</string>
+    <string name="paired_phones">Phones paired with this board</string>
+    <string name="no_phones">No phones paired yet.</string>
+    <string name="connected_badge">Connected</string>
+    <string name="phone_actions_message">Unpair removes this phone: it will need the QR code again.</string>
     <string name="test_hint">Tap here to test</string>
 
     <!-- board keyboard -->
     <string name="pair_title">Type with your phone</string>
-    <string name="pair_steps">Open Phone Keyboard on your phone and tap Scan (or scan this with the camera).</string>
+    <string name="pair_steps">On your phone: Phone Keyboard → Pair device, and scan this. Paired phones just tap this board in their list.</string>
     <string name="finding_relay">Finding the nearest Tailscale relay…</string>
     <string name="connecting_relay">Connecting to the relay…</string>
-    <string name="relay_line">Relay: %1$s (Tailscale DERP, end-to-end encrypted)</string>
-    <string name="connected">Phone connected: type on your phone</string>
+    <string name="board_line">%1$s · ID %2$s · relay %3$s (Tailscale DERP, end-to-end encrypted)</string>
+    <string name="connected">Connected: %1$s is typing</string>
     <string name="new_code">New code</string>
     <string name="unpair">Unpair</string>
+    <string name="disconnect">Disconnect</string>
     <string name="hide">Hide</string>
     <string name="switch_kb">Switch keyboard</string>
     <string name="qr_desc">Pairing QR code</string>
 
     <!-- board background link -->
     <string name="notif_channel">Phone link</string>
-    <string name="notif_waiting">Waiting for a phone (relay %1$s)</string>
-    <string name="notif_connected">Phone connected</string>
+    <string name="notif_title">%1$s · ID %2$s</string>
+    <string name="notif_waiting">Ready: paired phones can connect</string>
+    <string name="notif_connected">Connected: %1$s</string>
 
-    <!-- phone -->
-    <string name="scan">Scan board</string>
-    <string name="scan_prompt">Scan the QR code on the smart board</string>
+    <!-- phone keyboard screen -->
+    <string name="scan_prompt">Point the camera at the QR code on the smart board.</string>
     <string name="not_a_board_code">That is not a Phone Keyboard pairing code.</string>
-    <string name="phone_not_paired">Not paired: tap Scan board</string>
-    <string name="phone_connecting_relay">Connecting to %1$s…</string>
-    <string name="phone_waiting_board">Waiting for the board…</string>
-    <string name="phone_connected">Connected</string>
-    <string name="phone_no_field">Tap a text box on the board</string>
-    <string name="phone_rejected">Code expired: scan again</string>
+    <string name="devices">Devices</string>
+    <string name="reconnect">Reconnect</string>
+    <string name="pair_again">Pair again</string>
+    <string name="phone_connecting">Connecting to %1$s…</string>
+    <string name="phone_waiting_board">Waiting for %1$s…</string>
+    <string name="phone_connected">%1$s</string>
+    <string name="phone_no_field">%1$s: tap a text box</string>
+    <string name="phone_disconnected">Disconnected from %1$s</string>
+    <string name="phone_not_paired">%1$s doesn\'t know this phone</string>
 </resources>

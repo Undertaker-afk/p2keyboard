@@ -5,19 +5,31 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/** Phone side of the link: says hello with the scanned secret, keeps the session alive. */
+/** Phone side of the link: says hello (with the pairing secret the first time), keeps it alive. */
 public final class PhoneSession implements SecureLink.Listener {
 
-    public enum Status { CONNECTING_RELAY, WAITING_FOR_BOARD, CONNECTED, REJECTED }
+    public enum Status {
+        CONNECTING_RELAY,
+        WAITING_FOR_BOARD,
+        CONNECTED,
+        /** The board doesn't know this phone (never paired, or unpaired on the board): scan again. */
+        NOT_PAIRED,
+        /** The board ended the session (or another phone took over). */
+        DISCONNECTED
+    }
 
     public interface Listener {
         void onStatus(Status status);
+
+        /** The board's name, from its welcome. */
+        void onBoardName(String name);
 
         /** Editor state from the board (see RemoteOps). Called on a network thread. */
         void onBoardMessage(String message);
     }
 
     private final Pairing pairing;
+    private final String phoneName;
     private final SecureLink link;
     private final Listener listener;
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -28,8 +40,10 @@ public final class PhoneSession implements SecureLink.Listener {
     private volatile Status status = Status.CONNECTING_RELAY;
     private volatile long lastHeard;
 
-    public PhoneSession(Pairing pairing, byte[] privateKey, Listener listener) {
+    /** {@code pairing.secret} may be empty for a board this phone is already paired with. */
+    public PhoneSession(Pairing pairing, byte[] privateKey, String phoneName, Listener listener) {
         this.pairing = pairing;
+        this.phoneName = Pairing.cleanName(phoneName);
         this.link = new SecureLink(pairing.host, privateKey, this);
         this.listener = listener;
     }
@@ -54,16 +68,20 @@ public final class PhoneSession implements SecureLink.Listener {
         return status == Status.CONNECTED && link.send(pairing.boardKey, op);
     }
 
+    private void hello() {
+        link.send(pairing.boardKey, "h" + pairing.secret + "\n" + phoneName);
+    }
+
     private void tick() {
         if (!link.isOnline()) return;
         switch (status) {
             case WAITING_FOR_BOARD:
-                link.send(pairing.boardKey, "h" + pairing.secret);
+                hello();
                 break;
             case CONNECTED:
                 if (System.currentTimeMillis() - lastHeard > 25_000) {
                     setStatus(Status.WAITING_FOR_BOARD);
-                    link.send(pairing.boardKey, "h" + pairing.secret);
+                    hello();
                 } else {
                     link.send(pairing.boardKey, "p");
                 }
@@ -79,12 +97,16 @@ public final class PhoneSession implements SecureLink.Listener {
         listener.onStatus(s);
     }
 
+    private boolean finished() {
+        return status == Status.NOT_PAIRED || status == Status.DISCONNECTED;
+    }
+
     @Override
     public void onOnline(boolean online) {
-        if (status == Status.REJECTED) return;
+        if (finished()) return;
         if (online) {
             setStatus(Status.WAITING_FOR_BOARD);
-            link.send(pairing.boardKey, "h" + pairing.secret);
+            hello();
         } else {
             setStatus(Status.CONNECTING_RELAY);
         }
@@ -92,16 +114,23 @@ public final class PhoneSession implements SecureLink.Listener {
 
     @Override
     public void onMessage(byte[] peer, String msg) {
-        if (!Arrays.equals(peer, pairing.boardKey)) return;
+        if (!Arrays.equals(peer, pairing.boardKey) || msg.isEmpty()) return;
         lastHeard = System.currentTimeMillis();
-        switch (msg) {
-            case "w":
+        switch (msg.charAt(0)) {
+            case 'w':
+                listener.onBoardName(Pairing.cleanName(msg.substring(1)));
                 setStatus(Status.CONNECTED);
                 break;
-            case "x":
-                setStatus(Status.REJECTED);
+            case 'x':
+                if (msg.length() == 1) setStatus(Status.NOT_PAIRED);
+                else listener.onBoardMessage(msg);
                 break;
-            case "p":
+            case 'd':
+                if (msg.length() == 1) setStatus(Status.DISCONNECTED);
+                else listener.onBoardMessage(msg);
+                break;
+            case 'p':
+                if (msg.length() > 1) listener.onBoardMessage(msg);
                 break;
             default:
                 listener.onBoardMessage(msg);
