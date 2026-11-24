@@ -2,6 +2,7 @@
 build/
 local.properties
 *.apk
+!dist/*.apk
 .idea/
 *.iml
 .cxx/
