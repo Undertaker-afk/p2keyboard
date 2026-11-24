@@ -24,7 +24,10 @@ import app.p2keyboard.core.Pairing;
 import app.p2keyboard.core.PhoneSession;
 import app.p2keyboard.core.RemoteOps;
 
-/** Phone screen: scan the board's QR code, then type with PixelBoard; everything goes to the board. */
+/**
+ * Phone screen: scan the board's QR code, then type with the bundled keyboard (HeliBoard);
+ * everything goes to the board.
+ */
 public class PhoneActivity extends Activity implements PhoneSession.Listener, RemoteInputView.Sink {
 
     private static final String PREFS = "phone";
@@ -240,21 +243,17 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Re
     }
 
     private void refreshKeyboardBanner() {
-        PixelBoard.State st = PixelBoard.state(this);
+        Keyboards.State st = Keyboards.typingState(this);
         View banner = findViewById(R.id.kb_banner);
-        banner.setVisibility(st == PixelBoard.State.ACTIVE ? View.GONE : View.VISIBLE);
+        banner.setVisibility(st == Keyboards.State.ACTIVE ? View.GONE : View.VISIBLE);
         switch (st) {
-            case NOT_INSTALLED:
-                kbNote.setText(R.string.pb_not_installed);
-                kbButton.setText(R.string.pb_get);
-                break;
             case NOT_ENABLED:
-                kbNote.setText(R.string.pb_not_enabled);
-                kbButton.setText(R.string.pb_enable);
+                kbNote.setText(R.string.kb_not_enabled);
+                kbButton.setText(R.string.kb_enable);
                 break;
             case NOT_SELECTED:
-                kbNote.setText(R.string.pb_not_selected);
-                kbButton.setText(R.string.pb_select);
+                kbNote.setText(R.string.kb_not_selected);
+                kbButton.setText(R.string.kb_select);
                 break;
             default:
                 break;
@@ -262,10 +261,7 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Re
     }
 
     private void fixKeyboard() {
-        switch (PixelBoard.state(this)) {
-            case NOT_INSTALLED:
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(PixelBoard.RELEASES_URL)));
-                break;
+        switch (Keyboards.typingState(this)) {
             case NOT_ENABLED:
                 startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS));
                 break;

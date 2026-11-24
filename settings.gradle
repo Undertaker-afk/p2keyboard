@@ -10,7 +10,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://jitpack.io' }
     }
 }
 rootProject.name = "p2keyboard"
 include ':app'
+include ':keyboard'   // HeliBoard, the phone-side keyboard (see keyboard/UPSTREAM.md)

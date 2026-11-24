@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -13,9 +14,16 @@
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
+        tools:replace="android:label,android:icon,android:roundIcon,android:allowBackup">
+
+        <!-- Bundled HeliBoard: keep its settings screen, but no second launcher icon. -->
+        <activity android:name="helium314.keyboard.settings.SettingsActivity" tools:node="merge">
+            <intent-filter tools:node="removeAll" />
+        </activity>
 
         <activity
             android:name=".MainActivity"

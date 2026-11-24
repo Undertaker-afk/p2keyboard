@@ -7,6 +7,7 @@ import android.provider.Settings;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 
+import app.p2keyboard.phone.Keyboards;
 import app.p2keyboard.phone.PhoneActivity;
 
 /** Launcher: the same APK goes on the board (as a keyboard) and on the phone (as the remote). */
@@ -26,6 +27,9 @@ public class MainActivity extends Activity {
         });
         findViewById(R.id.btn_phone).setOnClickListener(
                 v -> startActivity(new Intent(this, PhoneActivity.class)));
+        // Settings of the bundled HeliBoard keyboard (layouts, languages, swipe, themes)
+        findViewById(R.id.btn_kb_settings).setOnClickListener(v -> startActivity(
+                new Intent().setClassName(this, "helium314.keyboard.settings.SettingsActivity")));
     }
 
     @Override
@@ -41,11 +45,17 @@ public class MainActivity extends Activity {
     }
 
     private void refresh() {
-        String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_INPUT_METHODS);
-        String current = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
-        String me = getPackageName() + "/";
-        if (current != null && current.startsWith(me)) boardStatus.setText(R.string.status_active);
-        else if (enabled != null && enabled.contains(me)) boardStatus.setText(R.string.status_enabled);
-        else boardStatus.setText(R.string.status_off);
+        switch (Keyboards.boardState(this)) {
+            case ACTIVE:
+                boardStatus.setText(R.string.status_active);
+                break;
+            case NOT_SELECTED:
+                boardStatus.setText(Keyboards.isOurs(Keyboards.current(this), this, Keyboards.TYPING_IME_CLASS)
+                        ? R.string.status_other_ours : R.string.status_enabled);
+                break;
+            default:
+                boardStatus.setText(R.string.status_off);
+                break;
+        }
     }
 }

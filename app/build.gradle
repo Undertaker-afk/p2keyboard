@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace 'app.p2keyboard'
-    compileSdk 34
+    compileSdk 37
 
     defaultConfig {
         applicationId 'app.p2keyboard'
@@ -23,6 +23,7 @@ android {
         }
     }
     compileOptions {
+        coreLibraryDesugaringEnabled true // required by the HeliBoard library
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
@@ -46,6 +47,8 @@ tasks.withType(Test).configureEach {
 }
 
 dependencies {
+    implementation project(':keyboard') // HeliBoard: the keyboard the phone types with
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation 'com.google.zxing:core:3.5.3'
     implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
     implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
