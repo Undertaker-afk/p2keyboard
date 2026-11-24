@@ -29,21 +29,12 @@
 
         <!-- Phone -->
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:text="@string/role_phone"
-            android:textColor="#5AA9FF"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            style="@style/Section"
+            android:text="@string/role_phone" />
 
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/role_phone_desc"
-            android:textColor="#B7C1CB"
-            android:textSize="15sp" />
+            style="@style/Body"
+            android:text="@string/role_phone_desc" />
 
         <Button
             android:id="@+id/btn_phone"
@@ -52,29 +43,14 @@
             android:layout_marginTop="8dp"
             android:text="@string/open_phone" />
 
-        <Button
-            android:id="@+id/btn_kb_settings"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/phone_kb_settings" />
-
         <!-- Board -->
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:text="@string/role_board"
-            android:textColor="#5AA9FF"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            style="@style/Section"
+            android:text="@string/role_board" />
 
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/role_board_desc"
-            android:textColor="#B7C1CB"
-            android:textSize="15sp" />
+            style="@style/Body"
+            android:text="@string/role_board_desc" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -94,15 +70,24 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:text="@string/step_select" />
+
+            <Button
+                android:id="@+id/btn_background"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/step_background" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/board_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textColor="#E8EDF2"
-            android:textSize="15sp" />
+            style="@style/Body"
+            android:textColor="#E8EDF2" />
+
+        <TextView
+            android:id="@+id/bg_status"
+            style="@style/Body"
+            android:textColor="#E8EDF2" />
 
         <EditText
             android:layout_width="match_parent"

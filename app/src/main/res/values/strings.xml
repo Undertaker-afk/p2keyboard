@@ -2,20 +2,22 @@
     <string name="app_name">Phone Keyboard</string>
     <string name="ime_label">Phone Keyboard (pair with QR)</string>
 
-    <!-- launcher -->
-    <string name="setup_intro">Install this same app on the smart board and on your phone. The phone types with the keyboard built into this app (HeliBoard); the text appears on the board.</string>
+    <!-- start screen -->
+    <string name="setup_intro">Install this same app on the smart board and on your phone. Type on the phone\'s keyboard; the text appears on the board.</string>
     <string name="role_phone">On your phone</string>
-    <string name="role_phone_desc">Turn on the built-in keyboard, scan the QR code the board shows, then type.</string>
-    <string name="phone_kb_settings">Typing keyboard settings</string>
+    <string name="role_phone_desc">Opens a full-screen keyboard in landscape. Scan the QR code the board shows, then type.</string>
     <string name="open_phone">Open phone keyboard</string>
     <string name="role_board">On the smart board</string>
-    <string name="role_board_desc">Enable Phone Keyboard and select it. Tapping any text box then shows a QR code instead of the on-screen keyboard.</string>
+    <string name="role_board_desc">Enable Phone Keyboard, select it, and allow it to run in the background. Tapping any text box then shows a QR code instead of the on-screen keyboard.</string>
     <string name="step_enable">1. Enable keyboard</string>
     <string name="step_select">2. Select keyboard</string>
-    <string name="status_off">Not enabled on this device</string>
-    <string name="status_enabled">Enabled: now select it as the active keyboard</string>
-    <string name="status_active">Active: tap the box below to see the QR code</string>
-    <string name="status_other_ours">The phone typing keyboard is active here. On the board, select \"Phone Keyboard (pair with QR)\" instead.</string>
+    <string name="step_background">3. Allow background running</string>
+    <string name="status_off">Keyboard: not enabled on this device</string>
+    <string name="status_enabled">Keyboard: enabled, now select it as the active keyboard</string>
+    <string name="status_active">Keyboard: active. Tap the box below to see the QR code</string>
+    <string name="bg_off">Background: limited by battery optimization (tap step 3)</string>
+    <string name="bg_on">Background: allowed</string>
+    <string name="bg_on_running">Background: allowed, link running</string>
     <string name="test_hint">Tap here to test</string>
 
     <!-- board keyboard -->
@@ -31,19 +33,19 @@
     <string name="switch_kb">Switch keyboard</string>
     <string name="qr_desc">Pairing QR code</string>
 
+    <!-- board background link -->
+    <string name="notif_channel">Phone link</string>
+    <string name="notif_waiting">Waiting for a phone (relay %1$s)</string>
+    <string name="notif_connected">Phone connected</string>
+
     <!-- phone -->
     <string name="scan">Scan board</string>
     <string name="scan_prompt">Scan the QR code on the smart board</string>
     <string name="not_a_board_code">That is not a Phone Keyboard pairing code.</string>
     <string name="phone_not_paired">Not paired: tap Scan board</string>
-    <string name="phone_connecting_relay">Connecting to relay %1$s…</string>
+    <string name="phone_connecting_relay">Connecting to %1$s…</string>
     <string name="phone_waiting_board">Waiting for the board…</string>
-    <string name="phone_connected">Connected: typing goes to the board</string>
-    <string name="phone_no_field">Connected: tap a text box on the board</string>
-    <string name="phone_rejected">Code expired: scan the board again</string>
-    <string name="mirror_hint">Tap here and type. Your text goes to the board.</string>
-    <string name="kb_not_enabled">Turn on "Phone Keyboard: Type", the keyboard bundled in this app, to type.</string>
-    <string name="kb_not_selected">Switch to "Phone Keyboard: Type" to type.</string>
-    <string name="kb_enable">Enable</string>
-    <string name="kb_select">Switch</string>
+    <string name="phone_connected">Connected</string>
+    <string name="phone_no_field">Tap a text box on the board</string>
+    <string name="phone_rejected">Code expired: scan again</string>
 </resources>

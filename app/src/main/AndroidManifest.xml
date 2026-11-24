@@ -1,29 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
-    <!-- To detect whether PixelBoard is installed (Android 11+ package visibility) -->
-    <queries>
-        <package android:name="com.akshaykadam.pixelboard" />
-    </queries>
+    <!-- Board: keep the link to the phone running in the background -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme"
-        tools:replace="android:label,android:icon,android:roundIcon,android:allowBackup">
-
-        <!-- Bundled HeliBoard: keep its settings screen, but no second launcher icon. -->
-        <activity android:name="helium314.keyboard.settings.SettingsActivity" tools:node="merge">
-            <intent-filter tools:node="removeAll" />
-        </activity>
+        android:theme="@style/AppTheme">
 
         <activity
             android:name=".MainActivity"
@@ -34,12 +30,15 @@
             </intent-filter>
         </activity>
 
-        <!-- Phone side. Scanning the board's QR with the stock camera opens p2k://pair?... here. -->
+        <!-- Phone side: landscape, full-screen, with the app's own keyboard.
+             Scanning the board's QR with the stock camera opens p2k://pair?... here. -->
         <activity
             android:name=".phone.PhoneActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:exported="true"
             android:launchMode="singleTask"
-            android:windowSoftInputMode="adjustResize|stateAlwaysVisible">
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="stateAlwaysHidden">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -48,7 +47,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Board side: the keyboard that shows the QR code and replays the phone's typing. -->
+        <!-- Board side: the input method that shows the QR code and types what the phone sends. -->
         <service
             android:name=".board.RemoteKeyboardService"
             android:exported="true"
@@ -61,5 +60,24 @@
                 android:name="android.view.im"
                 android:resource="@xml/method" />
         </service>
+
+        <!-- Board side: the always-on link to the phone (Tailscale DERP). -->
+        <service
+            android:name=".board.BoardLinkService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the remote keyboard connection to the paired phone open so typing works at any time." />
+        </service>
+
+        <receiver
+            android:name=".board.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

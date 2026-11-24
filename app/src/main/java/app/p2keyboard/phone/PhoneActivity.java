@@ -1,17 +1,20 @@
 package app.p2keyboard.phone;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.Settings;
-import android.text.SpannableStringBuilder;
+import android.text.InputType;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.inputmethod.InputMethodManager;
-import android.widget.Button;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -25,42 +28,55 @@ import app.p2keyboard.core.PhoneSession;
 import app.p2keyboard.core.RemoteOps;
 
 /**
- * Phone screen: scan the board's QR code, then type with the bundled keyboard (HeliBoard);
- * everything goes to the board.
+ * Phone screen: locked to landscape, full screen, with the app's own on-screen keyboard. Every key
+ * goes straight to the board over the DERP link; the line above the keys shows what the board's
+ * text box actually holds.
  */
-public class PhoneActivity extends Activity implements PhoneSession.Listener, RemoteInputView.Sink {
+public class PhoneActivity extends Activity implements PhoneSession.Listener, KeyboardView.Listener {
 
     private static final String PREFS = "phone";
+    private static final int MAX_PASTE = 5000;
 
     private PhoneSession session;
-    private RemoteInputView input;
-    private TextView status, mirrorView, kbNote;
-    private Button kbButton;
+    private KeyboardView keyboard;
+    private TextView status, preview;
     private boolean boardHasField = true;
     private String relayHost = "";
+    private String boardText = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_phone);
-        input = findViewById(R.id.remote_input);
+        keyboard = findViewById(R.id.keyboard);
         status = findViewById(R.id.status);
-        mirrorView = findViewById(R.id.mirror);
-        kbNote = findViewById(R.id.kb_note);
-        kbButton = findViewById(R.id.kb_button);
-        input.setSink(this);
-        mirrorView.setOnClickListener(v -> input.showKeyboard());
+        preview = findViewById(R.id.preview);
+        keyboard.setListener(this);
         findViewById(R.id.btn_scan).setOnClickListener(v -> scan());
-        kbButton.setOnClickListener(v -> fixKeyboard());
-
-        bindKey(R.id.k_tab, KeyEvent.KEYCODE_TAB);
-        bindKey(R.id.k_left, KeyEvent.KEYCODE_DPAD_LEFT);
-        bindKey(R.id.k_up, KeyEvent.KEYCODE_DPAD_UP);
-        bindKey(R.id.k_down, KeyEvent.KEYCODE_DPAD_DOWN);
-        bindKey(R.id.k_right, KeyEvent.KEYCODE_DPAD_RIGHT);
-        bindKey(R.id.k_esc, KeyEvent.KEYCODE_ESCAPE);
-
         acceptPairingFrom(getIntent());
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) hideSystemBars();
+    }
+
+    /** Full screen: more room for keys. Bars come back with a swipe from the edge. */
+    @SuppressWarnings("deprecation")
+    private void hideSystemBars() {
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            WindowInsetsController c = getWindow().getInsetsController();
+            if (c != null) {
+                c.hide(WindowInsets.Type.systemBars());
+                c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            }
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        }
     }
 
     @Override
@@ -77,19 +93,6 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Re
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        refreshKeyboardBanner();
-        input.postDelayed(input::showKeyboard, 200);
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) refreshKeyboardBanner(); // e.g. back from the keyboard picker
-    }
-
-    @Override
     protected void onStop() {
         if (session != null) session.stop();
         session = null;
@@ -101,8 +104,7 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Re
     /** A board QR scanned with the stock camera opens p2k://pair?... straight into this screen. */
     private boolean acceptPairingFrom(Intent intent) {
         Uri data = intent == null ? null : intent.getData();
-        if (data == null) return false;
-        return savePairing(data.toString());
+        return data != null && savePairing(data.toString());
     }
 
     private boolean savePairing(String text) {
@@ -137,14 +139,17 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Re
     private void restartSession() {
         if (session != null) session.stop();
         session = null;
+        boardText = "";
+        renderPreview();
         Pairing p = Pairing.parse(prefs().getString("pairing", null));
         if (p == null) {
             setStatus(getString(R.string.phone_not_paired), Color.parseColor("#F0B429"));
+            keyboard.setKeysEnabled(false);
             return;
         }
         relayHost = p.host;
         session = new PhoneSession(p, phoneKey(), this);
-        setStatus(getString(R.string.phone_connecting_relay, p.host), Color.parseColor("#F0B429"));
+        renderStatus();
         session.start();
     }
 
@@ -173,26 +178,45 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Re
         runOnUiThread(() -> {
             if (m.equals(RemoteOps.NO_FIELD)) {
                 boardHasField = false;
+                keyboard.setEnterLabel(null);
             } else if (m.charAt(0) == RemoteOps.EDITOR) {
                 String[] parts = m.substring(1).split(":", 4);
                 if (parts.length == 4) {
                     try {
-                        input.applyEditorInfo(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]),
-                                Integer.parseInt(parts[2]), parts[3]);
+                        keyboard.setEnterLabel(enterLabel(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), parts[3]));
                         boardHasField = true;
                     } catch (NumberFormatException ignored) {
                     }
                 }
             } else if (m.charAt(0) == RemoteOps.SEED) {
-                input.seed(m.substring(1));
+                boardText = m.substring(1);
+                renderPreview();
             }
             renderStatus();
         });
     }
 
+    /** Caption for Enter so it matches what it will do on the board. */
+    static String enterLabel(int inputType, int imeOptions, String actionLabel) {
+        if ((inputType & InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+                || (imeOptions & EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) return "Enter";
+        if (actionLabel != null && !actionLabel.isEmpty()) return actionLabel;
+        switch (imeOptions & EditorInfo.IME_MASK_ACTION) {
+            case EditorInfo.IME_ACTION_GO: return "Go";
+            case EditorInfo.IME_ACTION_SEARCH: return "Search";
+            case EditorInfo.IME_ACTION_SEND: return "Send";
+            case EditorInfo.IME_ACTION_NEXT: return "Next";
+            case EditorInfo.IME_ACTION_DONE: return "Done";
+            case EditorInfo.IME_ACTION_PREVIOUS: return "Prev";
+            default: return "Enter";
+        }
+    }
+
     private void renderStatus() {
         PhoneSession s = session;
         if (s == null) return;
+        boolean connected = s.status() == PhoneSession.Status.CONNECTED;
+        keyboard.setKeysEnabled(connected);
         switch (s.status()) {
             case CONNECTING_RELAY:
                 setStatus(getString(R.string.phone_connecting_relay, relayHost), Color.parseColor("#F0B429"));
@@ -202,7 +226,7 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Re
                 break;
             case CONNECTED:
                 setStatus(getString(boardHasField ? R.string.phone_connected : R.string.phone_no_field),
-                        boardHasField ? Color.parseColor("#35C46A") : Color.parseColor("#F0B429"));
+                        Color.parseColor(boardHasField ? "#35C46A" : "#F0B429"));
                 break;
             case REJECTED:
                 setStatus(getString(R.string.phone_rejected), Color.parseColor("#EF5350"));
@@ -215,61 +239,45 @@ public class PhoneActivity extends Activity implements PhoneSession.Listener, Re
         status.setTextColor(color);
     }
 
-    // ---- RemoteInputView.Sink -------------------------------------------------------------------
+    private void renderPreview() {
+        // Last line of what the board's text box holds, with a caret where its cursor is.
+        String t = boardText;
+        int nl = t.lastIndexOf('\n');
+        if (nl >= 0) t = t.substring(nl + 1);
+        preview.setText(t + "\u258F");
+    }
 
-    @Override
-    public void send(String op) {
+    // ---- KeyboardView.Listener ------------------------------------------------------------------
+
+    private void send(String op) {
         PhoneSession s = session;
         if (s != null) s.send(op);
     }
 
     @Override
-    public void onMirrorChanged() {
-        CharSequence text = input.mirror();
-        int cursor = Math.min(input.cursor(), text.length());
-        int from = Math.max(0, cursor - 600); // show the text around the cursor
-        SpannableStringBuilder shown = new SpannableStringBuilder(text, from, text.length());
-        shown.insert(cursor - from, "\u2502");
-        mirrorView.setText(shown);
+    public void onText(String text) {
+        send(RemoteOps.commit(text, 1));
     }
 
-    // ---- extra keys + keyboard banner -----------------------------------------------------------
-
-    private void bindKey(int id, int keyCode) {
-        findViewById(id).setOnClickListener(v -> {
-            send(RemoteOps.key(KeyEvent.ACTION_DOWN, keyCode, 0));
-            send(RemoteOps.key(KeyEvent.ACTION_UP, keyCode, 0));
-        });
+    @Override
+    public void onKey(int keyCode, int meta) {
+        for (String op : KeyPress.ops(keyCode, meta)) send(op);
     }
 
-    private void refreshKeyboardBanner() {
-        Keyboards.State st = Keyboards.typingState(this);
-        View banner = findViewById(R.id.kb_banner);
-        banner.setVisibility(st == Keyboards.State.ACTIVE ? View.GONE : View.VISIBLE);
-        switch (st) {
-            case NOT_ENABLED:
-                kbNote.setText(R.string.kb_not_enabled);
-                kbButton.setText(R.string.kb_enable);
-                break;
-            case NOT_SELECTED:
-                kbNote.setText(R.string.kb_not_selected);
-                kbButton.setText(R.string.kb_select);
-                break;
-            default:
-                break;
-        }
+    @Override
+    public void onEnter() {
+        send(RemoteOps.enter());
     }
 
-    private void fixKeyboard() {
-        switch (Keyboards.typingState(this)) {
-            case NOT_ENABLED:
-                startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS));
-                break;
-            case NOT_SELECTED:
-                ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).showInputMethodPicker();
-                break;
-            default:
-                break;
-        }
+    @Override
+    public void onPaste() {
+        ClipboardManager cm = getSystemService(ClipboardManager.class);
+        ClipData clip = cm == null ? null : cm.getPrimaryClip();
+        if (clip == null || clip.getItemCount() == 0) return;
+        CharSequence text = clip.getItemAt(0).coerceToText(this);
+        if (text == null || text.length() == 0) return;
+        String s = text.toString();
+        if (s.length() > MAX_PASTE) s = s.substring(0, MAX_PASTE);
+        send(RemoteOps.commit(s, 1));
     }
 }

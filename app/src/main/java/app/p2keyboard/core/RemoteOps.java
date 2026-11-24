@@ -14,21 +14,23 @@ package app.p2keyboard.core;
  *   k&lt;action&gt;:&lt;keyCode&gt;:&lt;meta&gt; sendKeyEvent
  *   a&lt;actionId&gt;                 performEditorAction
  *   M&lt;id&gt;                       performContextMenuAction (select all, cut, copy, paste)
+ *   E                           Enter: the board's field action (Search, Go, Send) or a new line
  *   s&lt;dStart&gt;:&lt;dEnd&gt;           setSelection, relative to the cursor
  *   r&lt;dStart&gt;:&lt;dEnd&gt;           setComposingRegion, relative to the cursor
  * board -> phone
  *   e&lt;inputType&gt;:&lt;imeOptions&gt;:&lt;actionId&gt;:&lt;actionLabel&gt;   a field is focused
  *   n                                                    no field focused
- *   t&lt;text before the cursor&gt;                           seeds the phone's mirror (for suggestions)
+ *   t&lt;text before the cursor&gt;                           what the field holds, for the phone's preview
  * </pre>
  * Selections are sent relative to the cursor because the phone only mirrors the text near it.
  */
 public final class RemoteOps {
     public static final char COMMIT = 'c', COMPOSE = 'm', FINISH = 'F', DELETE = 'd', DELETE_CP = 'D',
-            KEY = 'k', ACTION = 'a', MENU = 'M', SELECT = 's', REGION = 'r';
+            KEY = 'k', ACTION = 'a', MENU = 'M', SELECT = 's', REGION = 'r', ENTER = 'E';
     public static final char EDITOR = 'e', SEED = 't';
     public static final String NO_FIELD = "n";
-    public static final int SEED_CHARS = 1000;
+    /** How much text before the board's cursor is sent to the phone's preview. */
+    public static final int SEED_CHARS = 300;
 
     private RemoteOps() {}
 
@@ -49,6 +51,7 @@ public final class RemoteOps {
     public static String commit(CharSequence text, int pos) { return "c" + pos + ":" + text; }
     public static String compose(CharSequence text, int pos) { return "m" + pos + ":" + text; }
     public static String finish() { return "F"; }
+    public static String enter() { return "E"; }
     public static String delete(int before, int after) { return "d" + before + ":" + after; }
     public static String deleteCodePoints(int before, int after) { return "D" + before + ":" + after; }
     public static String key(int action, int keyCode, int meta) { return "k" + action + ":" + keyCode + ":" + meta; }
@@ -77,6 +80,7 @@ public final class RemoteOps {
                     return new Op(code, Integer.parseInt(rest.substring(0, colon)), 0, 0, rest.substring(colon + 1));
                 }
                 case FINISH:
+                case ENTER:
                     return new Op(code, 0, 0, 0, "");
                 case DELETE:
                 case DELETE_CP: {
