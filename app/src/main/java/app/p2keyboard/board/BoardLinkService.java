@@ -9,12 +9,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.database.ContentObserver;
 import android.net.wifi.WifiManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 
 import java.security.SecureRandom;
@@ -43,10 +45,14 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
         void onOp(String op);
 
         void onLinkChanged();
+
+        /** Switch from Phone Keyboard to {@code imeId}; true if it worked. */
+        boolean switchAway(String imeId);
     }
 
     public static final String ACTION_NEW_CODE = "app.p2keyboard.NEW_CODE";
     public static final String ACTION_DISCONNECT = "app.p2keyboard.DISCONNECT";
+    public static final String ACTION_TURN_OFF = "app.p2keyboard.TURN_OFF";
     static final String PREFS = "board";
     private static final String TAG = "p2k-board";
     private static final String CHANNEL = "link";
@@ -63,6 +69,8 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
     private String connectedName; // null when no phone is connected
     private String editorState = RemoteOps.NO_FIELD;
     private WifiManager.WifiLock wifiLock;
+    private boolean needsKeyboardPick; // phone connected but Android wouldn't let us switch keyboards
+    private ContentObserver keyboardObserver;
 
     public final class LocalBinder extends Binder {
         public BoardLinkService service() {
@@ -70,14 +78,28 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
         }
     }
 
-    /** Starts the link and marks this device as a board (so it also starts after a reboot). */
+    /** Starts the link (if turned on) and marks this device as a board, so it also starts after a reboot. */
     public static void start(Context c) {
         c.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean("is_board", true).apply();
+        if (!isEnabled(c)) return;
         try {
             c.startForegroundService(new Intent(c, BoardLinkService.class));
         } catch (RuntimeException e) {
             // Android refuses background starts in some states; the keyboard's binding keeps it running.
         }
+    }
+
+    /** The on/off switch: when off, nothing runs and the board just uses its normal keyboard. */
+    public static boolean isEnabled(Context c) {
+        return c.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("enabled", true);
+    }
+
+    /** Turns the phone link on or off (from the app's switch or the notification). */
+    public static void setEnabled(Context c, boolean on) {
+        c.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean("enabled", on).apply();
+        BoardLinkService s = instance;
+        if (s != null) s.applyEnabled();
+        else if (on) start(c);
     }
 
     public static boolean isBoard(Context c) {
@@ -110,22 +132,84 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
         phones = new PairedPhones(this);
         getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel(
                 CHANNEL, getString(R.string.notif_channel), NotificationManager.IMPORTANCE_LOW));
-        goForeground();
-        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        if (wm != null) {
-            // Keep Wi-Fi awake with the screen off, so a phone can still connect and type.
-            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "p2keyboard:link");
-            wifiLock.setReferenceCounted(false);
-            wifiLock.acquire();
+        // Learn which keyboard the board normally uses, and keep Phone Keyboard out of the way
+        // whenever no phone is connected.
+        KeyboardSwitch.rememberNormal(this, KeyboardSwitch.currentId(this));
+        keyboardObserver = new ContentObserver(main) {
+            @Override
+            public void onChange(boolean selfChange) {
+                KeyboardSwitch.rememberNormal(BoardLinkService.this, KeyboardSwitch.currentId(BoardLinkService.this));
+                applyKeyboard();
+                changed();
+            }
+        };
+        getContentResolver().registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD), false, keyboardObserver);
+        applyEnabled();
+    }
+
+    /** Starts or stops everything according to the on/off switch. */
+    private void applyEnabled() {
+        if (isEnabled(this)) {
+            goForeground();
+            if (wifiLock == null) {
+                WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                if (wm != null) {
+                    // Keep Wi-Fi awake with the screen off, so a phone can still connect and type.
+                    wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "p2keyboard:link");
+                    wifiLock.setReferenceCounted(false);
+                    wifiLock.acquire();
+                }
+            }
+            if (session == null) startSession();
+        } else {
+            if (session != null) session.stop();
+            session = null;
+            relayOnline = false;
+            connectedName = null;
+            if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+            wifiLock = null;
+            applyKeyboard(); // back to the normal keyboard
+            stopForeground(STOP_FOREGROUND_REMOVE);
+            stopSelf(); // ends once the keyboard unbinds
         }
-        startSession();
+        changed();
+    }
+
+    /**
+     * Phone Keyboard is the active keyboard only while a phone is connected; otherwise the board
+     * uses its normal keyboard.
+     */
+    public void applyKeyboard() {
+        needsKeyboardPick = false;
+        switch (KeyboardSwitch.decide(isEnabled(this), isPhoneConnected(), KeyboardSwitch.ourIsActive(this))) {
+            case TO_PHONE_KEYBOARD:
+                needsKeyboardPick = !KeyboardSwitch.switchTo(this, KeyboardSwitch.ourId(this));
+                break;
+            case TO_NORMAL_KEYBOARD: {
+                String normal = KeyboardSwitch.normalId(this);
+                if (normal != null && (ime == null || !ime.switchAway(normal))) KeyboardSwitch.switchTo(this, normal);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    public boolean needsKeyboardPick() {
+        return needsKeyboardPick;
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (!isEnabled(this)) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         goForeground();
         if (intent != null && ACTION_NEW_CODE.equals(intent.getAction())) newCode();
         if (intent != null && ACTION_DISCONNECT.equals(intent.getAction())) disconnectPhone();
+        if (intent != null && ACTION_TURN_OFF.equals(intent.getAction())) setEnabled(this, false);
         return START_STICKY;
     }
 
@@ -138,6 +222,7 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
     public void onDestroy() {
         if (session != null) session.stop();
         if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+        if (keyboardObserver != null) getContentResolver().unregisterContentObserver(keyboardObserver);
         main.removeCallbacksAndMessages(null);
         instance = null;
         super.onDestroy();
@@ -277,6 +362,7 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
         main.post(() -> {
             connectedName = phoneName.isEmpty() ? getString(R.string.unnamed_phone) : phoneName;
             if (session != null) session.sendToPhone(editorState);
+            applyKeyboard(); // switch to Phone Keyboard
             changed();
         });
     }
@@ -285,6 +371,7 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
     public void onPhoneDisconnected() {
         main.post(() -> {
             connectedName = null;
+            applyKeyboard(); // back to the normal keyboard
             changed();
         });
     }
@@ -302,17 +389,23 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
     }
 
     private void changed() {
-        getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, notification());
+        NotificationManager nm = getSystemService(NotificationManager.class);
+        if (isEnabled(this)) nm.notify(NOTIFICATION_ID, notification());
+        else nm.cancel(NOTIFICATION_ID);
         if (ime != null) ime.onLinkChanged();
         for (Runnable r : watchers) r.run();
     }
 
     private Notification notification() {
         String text;
-        if (connectedName != null) text = getString(R.string.notif_connected, connectedName);
+        if (connectedName != null && needsKeyboardPick) text = getString(R.string.notif_pick_keyboard, connectedName);
+        else if (connectedName != null) text = getString(R.string.notif_connected, connectedName);
         else if (relayOnline && session != null) text = getString(R.string.notif_waiting);
         else text = getString(R.string.connecting_relay);
-        PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class),
+        Intent openIntent = new Intent(this, MainActivity.class);
+        // Without a way to switch keyboards ourselves, tapping offers the keyboard picker instead.
+        if (connectedName != null && needsKeyboardPick) openIntent.setAction(MainActivity.ACTION_PICK_KEYBOARD);
+        PendingIntent open = PendingIntent.getActivity(this, 0, openIntent,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification.Builder b = new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notif)
@@ -325,6 +418,9 @@ public class BoardLinkService extends Service implements BoardSession.Listener {
                     new Intent(this, BoardLinkService.class).setAction(ACTION_DISCONNECT), PendingIntent.FLAG_IMMUTABLE);
             b.addAction(new Notification.Action.Builder(null, getString(R.string.disconnect), disconnect).build());
         }
+        PendingIntent off = PendingIntent.getService(this, 3,
+                new Intent(this, BoardLinkService.class).setAction(ACTION_TURN_OFF), PendingIntent.FLAG_IMMUTABLE);
+        b.addAction(new Notification.Action.Builder(null, getString(R.string.turn_off), off).build());
         return b.build();
     }
 }

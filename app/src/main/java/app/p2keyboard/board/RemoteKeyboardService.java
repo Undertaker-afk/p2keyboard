@@ -122,6 +122,39 @@ public class RemoteKeyboardService extends InputMethodService implements BoardLi
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
         refreshUi();
+        // No phone connected (or Phone Keyboard turned off): use the board's normal keyboard.
+        main.post(this::leaveIfIdle);
+    }
+
+    @Override
+    public void onWindowShown() {
+        super.onWindowShown();
+        main.post(this::leaveIfIdle);
+    }
+
+    private void leaveIfIdle() {
+        BoardLinkService l = link();
+        boolean phoneConnected = l != null && l.isPhoneConnected() && BoardLinkService.isEnabled(this);
+        if (phoneConnected) return;
+        String normal = KeyboardSwitch.normalId(this);
+        if (normal != null) switchAway(normal);
+        // else: no other keyboard is enabled; the pairing panel stays as a fallback
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public boolean switchAway(String imeId) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                switchInputMethod(imeId); // the active keyboard may always hand over to another one
+            } else {
+                IBinder token = getWindow().getWindow().getAttributes().token;
+                ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).setInputMethod(token, imeId);
+            }
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     @Override

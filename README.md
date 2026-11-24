@@ -24,11 +24,26 @@ over HTTPS (port 443), which gets through NAT, guest Wi-Fi and school firewalls.
 
 **Board**
 1. Install `app-release.apk` and open *Phone Keyboard*.
-2. **1. Enable keyboard** → turn on *Phone Keyboard (pair with QR)*.
-3. **2. Select keyboard** → pick it.
-4. **3. Allow background running** → allow notifications and "don't optimize battery".
+2. **1. Enable keyboard** → turn on *Phone Keyboard (pair with QR)*. Don't select it: the board
+   keeps its normal keyboard, and Phone Keyboard switches in by itself when a phone connects.
+3. **2. Allow background running** → allow notifications and "don't optimize battery".
    On boards with their own app freezer or cleaner, whitelist the app there too.
-5. Tap any text box: a QR code appears instead of a keyboard.
+4. **3. Allow automatic keyboard switching** → under Accessibility, turn on *Phone Keyboard*
+   (Android 11+). It only switches keyboards and reads nothing on screen. On older Android, or
+   instead of that, run once from a computer:
+   `adb shell pm grant app.p2keyboard android.permission.WRITE_SECURE_SETTINGS`.
+   Without either, the board still works: when a phone connects, tap the notification and pick
+   Phone Keyboard.
+5. The board's QR code is on the app's start screen. Phones pair with it once.
+
+**When is Phone Keyboard active?** Only while a paired phone is connected. The phone sends a
+heartbeat every 2 seconds. When the phone leaves, or nothing arrives for about 6 seconds (app
+closed, phone locked, Wi-Fi gone), the board switches back to its normal keyboard on its own.
+
+**Turning it off:** use the **Phone Keyboard on this board** switch in the app, or **Turn off** in
+the notification. Then nothing runs on the board, which keeps its normal keyboard, until you turn
+it back on. On the phone, **Disconnect** (or just leaving the keyboard screen) ends the
+connection at once.
 
 **Phone**
 1. Install the same APK and open it. The top card shows this phone's name (tap it to rename) and ID.
@@ -36,7 +51,7 @@ over HTTPS (port 443), which gets through NAT, guest Wi-Fi and school firewalls.
    board's keyboard area when you tap a text box, and on the board's start screen.
    You can also scan with the stock camera: `p2k://` links open the app and pair.
 3. The board appears under **Paired devices** and the landscape keyboard opens. Next time,
-   just tap the board in the list.
+   just tap the board in the list. The board switches to Phone Keyboard while you're connected.
 
 On the board, **New code** replaces the QR code so it can't pair new phones; already-paired
 phones keep working. To remove a phone, tap it under *Phones paired with this board* →
@@ -93,7 +108,8 @@ released last, so the board's apps treat them like a real keyboard.
 | `board/PairedPhones.java`, `phone/PairedBoards.java` | Paired-device lists on each side |
 | `MainActivity.java`, `phone/ScanActivity.java` | Home screen (this device, Pair device, device lists) and the scan screen |
 | `core/RemoteOps.java` | Wire format |
-| `board/BoardLinkService.java`, `board/BootReceiver.java` | Always-on background link |
+| `board/BoardLinkService.java`, `board/BootReceiver.java` | Background link (on/off switch, starts at boot) |
+| `board/KeyboardSwitch.java`, `board/SwitcherAccessibilityService.java` | Switching to Phone Keyboard and back as phones come and go |
 | `board/RemoteKeyboardService.java`, `board/OpApplier.java` | Board input method: QR code, typing into the focused field, live preview |
 | `phone/PhoneActivity.java`, `phone/KeyboardView.java`, `phone/KeyPress.java` | Landscape phone screen and its keyboard |
 
@@ -106,6 +122,7 @@ released last, so the board's apps treat them like a real keyboard.
 Needs JDK 17 and the Android SDK (platform 34). The release APK is minified and signed with the
 debug key so it can be sideloaded. GitHub Actions builds it on every push.
 
+`KeyboardSwitchTest` covers when to switch and the switching itself.
 Tests: `CoreTest` covers the crypto vectors, pairing codes, device IDs, op parsing and DERP map
 parsing. `HomeScreenTest` checks that Pair device asks for the camera before opening the scanner,
 that a scanned or camera-linked board is saved and opened, and that the device list works.

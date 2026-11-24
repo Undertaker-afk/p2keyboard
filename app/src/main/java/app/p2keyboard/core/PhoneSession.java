@@ -28,6 +28,10 @@ public final class PhoneSession implements SecureLink.Listener {
         void onBoardMessage(String message);
     }
 
+    /** The phone says "I'm here" this often; the board treats 3 missed beats as gone. */
+    public static final long HEARTBEAT_MS = 2_000;
+    static final long TIMEOUT_MS = 6_000;
+
     private final Pairing pairing;
     private final String phoneName;
     private final SecureLink link;
@@ -54,7 +58,7 @@ public final class PhoneSession implements SecureLink.Listener {
 
     public void start() {
         link.start();
-        timer.scheduleWithFixedDelay(this::tick, 3, 3, TimeUnit.SECONDS);
+        timer.scheduleWithFixedDelay(this::tick, HEARTBEAT_MS, HEARTBEAT_MS, TimeUnit.MILLISECONDS);
     }
 
     public void stop() {
@@ -79,7 +83,7 @@ public final class PhoneSession implements SecureLink.Listener {
                 hello();
                 break;
             case CONNECTED:
-                if (System.currentTimeMillis() - lastHeard > 25_000) {
+                if (System.currentTimeMillis() - lastHeard > TIMEOUT_MS) {
                     setStatus(Status.WAITING_FOR_BOARD);
                     hello();
                 } else {

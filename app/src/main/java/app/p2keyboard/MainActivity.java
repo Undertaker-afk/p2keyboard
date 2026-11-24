@@ -22,12 +22,14 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.List;
 
 import app.p2keyboard.board.BoardLinkService;
+import app.p2keyboard.board.KeyboardSwitch;
 import app.p2keyboard.board.PairedPhones;
 import app.p2keyboard.board.QrCodes;
 import app.p2keyboard.board.RemoteKeyboardService;
@@ -43,10 +45,14 @@ import app.p2keyboard.phone.ScanActivity;
  */
 public class MainActivity extends Activity {
     private static final String ACTION_PAIR = "app.p2keyboard.PAIR";
+    /** From the board's notification when it couldn't switch keyboards by itself. */
+    public static final String ACTION_PICK_KEYBOARD = "app.p2keyboard.PICK_KEYBOARD";
     private static final int REQ_CAMERA = 1, REQ_NOTIFICATIONS = 2, REQ_SCAN = 3;
 
     private PairedBoards boards;
-    private TextView deviceName, deviceId, boardStatus, bgStatus, boardInfo;
+    private TextView deviceName, deviceId, boardStatus, bgStatus, switchStatus, boardInfo;
+    private Switch boardOn;
+    private boolean rendering;
     private LinearLayout boardList, phoneList, boardQrBox;
     private ImageView boardQr;
     private String shownQr;
@@ -69,6 +75,13 @@ public class MainActivity extends Activity {
         phoneList = findViewById(R.id.phone_list);
         boardStatus = findViewById(R.id.board_status);
         bgStatus = findViewById(R.id.bg_status);
+        switchStatus = findViewById(R.id.switch_status);
+        boardOn = findViewById(R.id.board_on);
+        boardOn.setOnCheckedChangeListener((b, on) -> {
+            if (rendering) return;
+            BoardLinkService.setEnabled(this, on);
+            refresh();
+        });
         boardInfo = findViewById(R.id.board_info);
         boardQrBox = findViewById(R.id.board_qr_box);
         boardQr = findViewById(R.id.board_qr);
@@ -77,11 +90,9 @@ public class MainActivity extends Activity {
         findViewById(R.id.btn_pair).setOnClickListener(v -> pairDevice());
         findViewById(R.id.btn_enable).setOnClickListener(
                 v -> startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)));
-        findViewById(R.id.btn_select).setOnClickListener(v -> {
-            InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-            if (imm != null) imm.showInputMethodPicker();
-        });
         findViewById(R.id.btn_background).setOnClickListener(v -> allowBackground());
+        findViewById(R.id.btn_autoswitch).setOnClickListener(
+                v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         findViewById(R.id.btn_board_new_code).setOnClickListener(v -> {
             BoardLinkService l = BoardLinkService.get();
             if (l != null) l.newCode();
@@ -102,6 +113,13 @@ public class MainActivity extends Activity {
         if (ACTION_PAIR.equals(intent.getAction())) {
             intent.setAction(null);
             pairDevice();
+        } else if (ACTION_PICK_KEYBOARD.equals(intent.getAction())) {
+            intent.setAction(null);
+            // a phone connected but Android didn't let us switch: let the user pick Phone Keyboard
+            getWindow().getDecorView().post(() -> {
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showInputMethodPicker();
+            });
         } else if (intent.getData() != null) {
             String uri = intent.getData().toString();
             intent.setData(null);
@@ -246,14 +264,18 @@ public class MainActivity extends Activity {
         deviceId.setText(getString(R.string.device_id, Identity.deviceId(this)));
         renderBoards();
 
-        if (boardImeIs(true)) {
-            boardStatus.setText(R.string.status_active);
-            BoardLinkService.start(this); // a board: make sure the link is up
-        } else if (boardImeIs(false)) {
-            boardStatus.setText(R.string.status_enabled);
-        } else {
+        rendering = true;
+        boardOn.setChecked(BoardLinkService.isEnabled(this));
+        rendering = false;
+        if (!boardImeIs(false)) {
             boardStatus.setText(R.string.status_off);
+        } else {
+            boardStatus.setText(R.string.status_enabled_auto);
+            if (BoardLinkService.isEnabled(this)) BoardLinkService.start(this); // a board: keep the link up
         }
+        switchStatus.setText(KeyboardSwitch.canWriteSettings(this) ? R.string.autoswitch_adb
+                : KeyboardSwitch.canSwitchAutomatically(this) ? R.string.autoswitch_on
+                : Build.VERSION.SDK_INT >= 30 ? R.string.autoswitch_off : R.string.autoswitch_old_android);
         PowerManager pm = getSystemService(PowerManager.class);
         boolean unrestricted = pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
         BoardLinkService link = BoardLinkService.get();
@@ -294,7 +316,7 @@ public class MainActivity extends Activity {
 
     /** On a board: its pairing QR code and the phones paired with it. */
     private void renderBoardRole(BoardLinkService link) {
-        boolean board = link != null;
+        boolean board = link != null && BoardLinkService.isEnabled(this);
         boardQrBox.setVisibility(board ? View.VISIBLE : View.GONE);
         phoneList.removeAllViews();
         if (!board) return;

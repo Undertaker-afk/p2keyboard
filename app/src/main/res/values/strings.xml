@@ -27,14 +27,21 @@
 
     <!-- board setup -->
     <string name="role_board">Use this device as a smart board</string>
-    <string name="role_board_desc">Enable Phone Keyboard, select it, and allow it to run in the background. Then phones can pair by scanning the code, and tapping any text box shows the code instead of the on-screen keyboard.</string>
+    <string name="role_board_desc">The board keeps its normal keyboard. When a paired phone connects, Phone Keyboard takes over, and when the phone stops (no heartbeat for a few seconds) the normal keyboard comes back.</string>
+    <string name="board_on">Phone Keyboard on this board</string>
+    <string name="step_autoswitch">3. Allow automatic keyboard switching</string>
+    <string name="status_enabled_auto">Keyboard: enabled. It switches in when a phone connects.</string>
+    <string name="autoswitch_on">Switching: automatic</string>
+    <string name="autoswitch_adb">Switching: automatic (adb permission)</string>
+    <string name="autoswitch_off">Switching: not allowed yet. In step 3, turn on \"Phone Keyboard\" under Accessibility. Until then you choose Phone Keyboard from the notification.</string>
+    <string name="autoswitch_old_android">Switching: this Android version needs a one-time adb command for automatic switching (see README). Until then you choose Phone Keyboard from the notification.</string>
+    <string name="a11y_description">Lets Phone Keyboard switch this board to the phone keyboard when a paired phone connects, and back to the normal keyboard when it leaves. It does not read the screen or anything you type.</string>
+    <string name="turn_off">Turn off</string>
+    <string name="notif_pick_keyboard">%1$s connected: tap to switch to Phone Keyboard</string>
     <string name="step_enable">1. Enable keyboard</string>
-    <string name="step_select">2. Select keyboard</string>
-    <string name="step_background">3. Allow background running</string>
+        <string name="step_background">2. Allow background running</string>
     <string name="status_off">Keyboard: not enabled on this device</string>
-    <string name="status_enabled">Keyboard: enabled, now select it as the active keyboard</string>
-    <string name="status_active">Keyboard: active</string>
-    <string name="bg_off">Background: limited by battery optimization (tap step 3)</string>
+            <string name="bg_off">Background: limited by battery optimization (tap step 2)</string>
     <string name="bg_on">Background: allowed</string>
     <string name="bg_on_running">Background: allowed, link running</string>
     <string name="board_qr_ready">Scan this with Pair device on your phone. Paired phones can connect any time without it.</string>
@@ -67,7 +74,7 @@
     <!-- phone keyboard screen -->
     <string name="scan_prompt">Point the camera at the QR code on the smart board.</string>
     <string name="not_a_board_code">That is not a Phone Keyboard pairing code.</string>
-    <string name="devices">Devices</string>
+    <string name="devices">Disconnect</string>
     <string name="reconnect">Reconnect</string>
     <string name="pair_again">Pair again</string>
     <string name="phone_connecting">Connecting to %1$s…</string>

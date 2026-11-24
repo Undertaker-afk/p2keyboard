@@ -42,7 +42,8 @@ public final class BoardSession implements SecureLink.Listener {
         void trust(byte[] phoneKey, String phoneName);
     }
 
-    private static final long PHONE_TIMEOUT_MS = 30_000;
+    /** A phone is active while it heartbeats (every 2 s); after 3 missed beats it counts as gone. */
+    private static final long PHONE_TIMEOUT_MS = 6_000;
 
     private final SecureLink link;
     private final Listener listener;
@@ -73,7 +74,7 @@ public final class BoardSession implements SecureLink.Listener {
                 expired = phone != null && System.currentTimeMillis() - lastSeen > PHONE_TIMEOUT_MS;
             }
             if (expired) dropPhone(null);
-        }, 5, 5, TimeUnit.SECONDS);
+        }, 1, 1, TimeUnit.SECONDS);
     }
 
     public void stop() {
