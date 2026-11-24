@@ -24,6 +24,7 @@ import android.view.inputmethod.InputMethodManager;
  */
 public final class KeyboardSwitch {
     private static final String PREF_NORMAL = "normal_ime";
+    private static final String PREF_CHOSEN = "normal_ime_chosen";
 
     private KeyboardSwitch() {}
 
@@ -57,23 +58,100 @@ public final class KeyboardSwitch {
         return x != null && x.equals(y);
     }
 
-    /** Remembers the keyboard the board normally uses (anything that isn't Phone Keyboard). */
-    public static void rememberNormal(Context c, String id) {
-        if (id == null || same(c, id, ourId(c))) return;
-        prefs(c).edit().putString(PREF_NORMAL, id).apply();
+    /** A candidate for "the board's normal keyboard". */
+    public static final class Candidate {
+        public final String id;
+        public final CharSequence label;
+        final boolean system, keyboard;
+
+        public boolean isKeyboard() {
+            return keyboard;
+        }
+
+        public Candidate(String id, CharSequence label, boolean system, boolean keyboard) {
+            this.id = id;
+            this.label = label;
+            this.system = system;
+            this.keyboard = keyboard;
+        }
     }
 
-    /** The board's normal keyboard: the last one it used, else the first other enabled keyboard. */
-    public static String normalId(Context c) {
+    /**
+     * Real keyboards only: voice input (Google voice typing etc.) is registered as an input method
+     * too, but only offers "voice" subtypes. It also becomes the active input method for a moment
+     * whenever someone taps the mic, so it must never be remembered as the board's keyboard.
+     */
+    static boolean isKeyboard(InputMethodInfo i) {
+        int n = i.getSubtypeCount();
+        if (n == 0) return !i.getId().toLowerCase(java.util.Locale.ROOT).contains("voice");
+        for (int k = 0; k < n; k++) {
+            String mode = i.getSubtypeAt(k).getMode();
+            if (mode == null || mode.isEmpty() || "keyboard".equals(mode)) return true;
+        }
+        return false;
+    }
+
+    /** Enabled input methods other than Phone Keyboard, as candidates for the normal keyboard. */
+    public static java.util.List<Candidate> candidates(Context c) {
         InputMethodManager imm = (InputMethodManager) c.getSystemService(Context.INPUT_METHOD_SERVICE);
-        String saved = prefs(c).getString(PREF_NORMAL, null);
-        String first = null;
+        java.util.List<Candidate> out = new java.util.ArrayList<>();
         for (InputMethodInfo i : imm.getEnabledInputMethodList()) {
             if (same(c, i.getId(), ourId(c))) continue;
-            if (saved != null && same(c, i.getId(), saved)) return i.getId();
-            if (first == null) first = i.getId();
+            boolean system = i.getServiceInfo() != null && i.getServiceInfo().applicationInfo != null
+                    && (i.getServiceInfo().applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0;
+            CharSequence label;
+            try {
+                label = i.loadLabel(c.getPackageManager());
+            } catch (RuntimeException e) {
+                label = i.getId();
+            }
+            out.add(new Candidate(i.getId(), label, system, isKeyboard(i)));
         }
-        return first;
+        return out;
+    }
+
+    /**
+     * Picks the normal keyboard: the one chosen or last used (if it's a real keyboard), else the
+     * board's preinstalled keyboard, else any keyboard. Voice input only as a last resort.
+     */
+    static String pick(java.util.List<Candidate> list, String saved) {
+        Candidate firstSystemKeyboard = null, firstKeyboard = null;
+        for (Candidate k : list) {
+            if (!k.keyboard) continue;
+            if (saved != null && sameId(k.id, saved)) return k.id;
+            if (k.system && firstSystemKeyboard == null) firstSystemKeyboard = k;
+            if (firstKeyboard == null) firstKeyboard = k;
+        }
+        if (firstSystemKeyboard != null) return firstSystemKeyboard.id;
+        if (firstKeyboard != null) return firstKeyboard.id;
+        return list.isEmpty() ? null : list.get(0).id;
+    }
+
+    private static boolean sameId(String a, String b) {
+        ComponentName x = ComponentName.unflattenFromString(a), y = ComponentName.unflattenFromString(b);
+        return x != null && x.equals(y);
+    }
+
+    /** Remembers the keyboard the board uses when someone switches to it (real keyboards only). */
+    public static void rememberNormal(Context c, String id) {
+        if (id == null || same(c, id, ourId(c))) return;
+        if (prefs(c).getBoolean(PREF_CHOSEN, false)) return; // the user picked one explicitly
+        for (Candidate k : candidates(c)) {
+            if (k.keyboard && sameId(k.id, id)) {
+                prefs(c).edit().putString(PREF_NORMAL, id).apply();
+                return;
+            }
+        }
+    }
+
+    /** The user's explicit choice from the board screen (null = automatic). */
+    public static void chooseNormal(Context c, String id) {
+        prefs(c).edit().putString(PREF_NORMAL, id).putBoolean(PREF_CHOSEN, id != null).apply();
+    }
+
+    /** The board's normal keyboard, used whenever no phone is connected. */
+    public static String normalId(Context c) {
+        return pick(candidates(c), prefs(c).getString(PREF_NORMAL, null));
     }
 
     public static boolean canWriteSettings(Context c) {

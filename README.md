@@ -46,7 +46,10 @@ over HTTPS (port 443), which gets through NAT, guest Wi-Fi and school firewalls.
    `adb shell pm grant app.p2keyboard android.permission.WRITE_SECURE_SETTINGS`.
    Without either, the board still works: when a phone connects, tap the notification and pick
    Phone Keyboard.
-5. The board's QR code is on the app's start screen. Phones pair with it once.
+5. **Normal keyboard** (on the start screen) shows which keyboard the board uses when no phone
+   is connected. It's picked automatically (the board's built-in keyboard; voice input never
+   counts), and **Change** lets you choose another.
+6. The board's QR code is on the app's start screen. Phones pair with it once.
 
 **When is Phone Keyboard active?** Only while a paired phone is connected. The phone sends a
 heartbeat every 2 seconds. When the phone leaves, or nothing arrives for about 6 seconds (app

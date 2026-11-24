@@ -43,6 +43,8 @@ public class KeyboardSwitchTest {
         InputMethodManager imm = app.getSystemService(InputMethodManager.class);
         shadowOf(imm).setEnabledInputMethodInfoList(Arrays.asList(
                 ime(app.getPackageName(), RemoteKeyboardService.class.getName()),
+                // Google voice typing: an input method, but not a keyboard (listed first on purpose)
+                ime("com.google.android.googlequicksearchbox", "com.google.android.voicesearch.ime.VoiceInputMethodService"),
                 ime("com.android.inputmethod.latin", "com.android.inputmethod.latin.LatinIME")));
         Settings.Secure.putString(app.getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD, NORMAL);
     }
@@ -62,6 +64,34 @@ public class KeyboardSwitchTest {
         assertEquals(NORMAL, ComponentName.unflattenFromString(KeyboardSwitch.normalId(app)).flattenToShortString());
         // remembering Phone Keyboard as "normal" is refused
         KeyboardSwitch.rememberNormal(app, KeyboardSwitch.ourId(app));
+        assertEquals(NORMAL, ComponentName.unflattenFromString(KeyboardSwitch.normalId(app)).flattenToShortString());
+    }
+
+    @Test
+    public void voiceInputIsNeverTheNormalKeyboard() {
+        String voice = "com.google.android.googlequicksearchbox/com.google.android.voicesearch.ime.VoiceInputMethodService";
+        // tapping the mic makes voice input the active input method for a moment: not remembered
+        KeyboardSwitch.rememberNormal(app, voice);
+        assertEquals(NORMAL, ComponentName.unflattenFromString(KeyboardSwitch.normalId(app)).flattenToShortString());
+    }
+
+    @Test
+    public void picksChosenThenSystemKeyboardThenAnyKeyboard() {
+        KeyboardSwitch.Candidate voice = new KeyboardSwitch.Candidate("g/.Voice", "Voice", true, false);
+        KeyboardSwitch.Candidate gboard = new KeyboardSwitch.Candidate("gb/.Latin", "Gboard", false, true);
+        KeyboardSwitch.Candidate builtIn = new KeyboardSwitch.Candidate("aosp/.Latin", "Board keyboard", true, true);
+        java.util.List<KeyboardSwitch.Candidate> all = Arrays.asList(voice, gboard, builtIn);
+        assertEquals("aosp/.Latin", KeyboardSwitch.pick(all, null));          // preinstalled keyboard
+        assertEquals("gb/.Latin", KeyboardSwitch.pick(all, "gb/.Latin"));     // the chosen / last used one
+        assertEquals("aosp/.Latin", KeyboardSwitch.pick(all, "g/.Voice"));    // a saved voice IME is ignored
+        assertEquals("gb/.Latin", KeyboardSwitch.pick(Arrays.asList(voice, gboard), null));
+        assertEquals("g/.Voice", KeyboardSwitch.pick(Arrays.asList(voice), null)); // nothing else at all
+    }
+
+    @Test
+    public void chosenKeyboardSticks() {
+        KeyboardSwitch.chooseNormal(app, NORMAL);
+        KeyboardSwitch.rememberNormal(app, "other.pkg/.Keyboard"); // later switches don't override a choice
         assertEquals(NORMAL, ComponentName.unflattenFromString(KeyboardSwitch.normalId(app)).flattenToShortString());
     }
 

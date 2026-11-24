@@ -10,8 +10,8 @@ android {
         applicationId 'app.p2keyboard'
         minSdk 26
         targetSdk 34
-        versionCode 7
-        versionName '4.3'
+        versionCode 8
+        versionName '4.4'
     }
 
     // One codebase, three APKs. Google Play Protect blocks sideloaded apps that declare an

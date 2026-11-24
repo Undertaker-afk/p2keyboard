@@ -50,7 +50,7 @@ public class MainActivity extends Activity {
     private static final int REQ_CAMERA = 1, REQ_NOTIFICATIONS = 2, REQ_SCAN = 3;
 
     private PairedBoards boards;
-    private TextView deviceName, deviceId, boardStatus, bgStatus, switchStatus, boardInfo;
+    private TextView deviceName, deviceId, boardStatus, bgStatus, switchStatus, normalKb, boardInfo;
     private Switch boardOn;
     private boolean rendering;
     private LinearLayout boardList, phoneList, boardQrBox;
@@ -76,6 +76,8 @@ public class MainActivity extends Activity {
         boardStatus = findViewById(R.id.board_status);
         bgStatus = findViewById(R.id.bg_status);
         switchStatus = findViewById(R.id.switch_status);
+        normalKb = findViewById(R.id.normal_kb);
+        findViewById(R.id.btn_normal_kb).setOnClickListener(v -> chooseNormalKeyboard());
         boardOn = findViewById(R.id.board_on);
         boardOn.setOnCheckedChangeListener((b, on) -> {
             if (rendering) return;
@@ -266,6 +268,37 @@ public class MainActivity extends Activity {
         return false;
     }
 
+    /** Name of the keyboard the board uses when no phone is connected. */
+    private String normalLabel() {
+        String id = KeyboardSwitch.normalId(this);
+        for (KeyboardSwitch.Candidate k : KeyboardSwitch.candidates(this)) {
+            if (k.id.equals(id)) return k.label.toString();
+        }
+        return getString(R.string.normal_kb_none);
+    }
+
+    /** Lets the user pick the board's normal keyboard (real keyboards only, no voice input). */
+    private void chooseNormalKeyboard() {
+        java.util.List<KeyboardSwitch.Candidate> keyboards = new java.util.ArrayList<>();
+        for (KeyboardSwitch.Candidate k : KeyboardSwitch.candidates(this)) if (k.isKeyboard()) keyboards.add(k);
+        String[] names = new String[keyboards.size() + 1];
+        names[0] = getString(R.string.normal_kb_auto);
+        for (int i = 0; i < keyboards.size(); i++) names[i + 1] = keyboards.get(i).label.toString();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.normal_kb_title)
+                .setItems(names, (d, which) -> {
+                    KeyboardSwitch.chooseNormal(this, which == 0 ? null : keyboards.get(which - 1).id);
+                    BoardLinkService l = BoardLinkService.get();
+                    if (l == null || !l.isPhoneConnected()) {
+                        KeyboardSwitch.switchTo(this, KeyboardSwitch.normalId(this)); // e.g. leave voice input
+                    } else {
+                        l.applyKeyboard();
+                    }
+                    refresh();
+                })
+                .show();
+    }
+
     // ---- rendering ------------------------------------------------------------------------------
 
     private void refresh() {
@@ -285,6 +318,7 @@ public class MainActivity extends Activity {
             boardStatus.setText(R.string.status_enabled_auto);
             if (BoardLinkService.isEnabled(this)) BoardLinkService.start(this); // a board: keep the link up
         }
+        normalKb.setText(getString(R.string.normal_kb, normalLabel()));
         switchStatus.setText(KeyboardSwitch.canWriteSettings(this) ? R.string.autoswitch_adb
                 : KeyboardSwitch.canSwitchAutomatically(this) ? R.string.autoswitch_on
                 : !BuildConfig.HAS_ACCESSIBILITY ? R.string.autoswitch_lite
