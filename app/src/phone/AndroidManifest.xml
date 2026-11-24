@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Phone APK: pairing, scanning and the landscape keyboard. Nothing of the board side. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:node="remove" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:node="remove" />
+
+    <application>
+        <service android:name=".board.RemoteKeyboardService" tools:node="remove" />
+        <service android:name=".board.BoardLinkService" tools:node="remove" />
+        <service android:name=".board.SwitcherAccessibilityService" tools:node="remove" />
+        <receiver android:name=".board.BootReceiver" tools:node="remove" />
+        <!-- the app has its own scan screen -->
+        <activity android:name="com.journeyapps.barcodescanner.CaptureActivity" tools:node="remove" />
+    </application>
+</manifest>

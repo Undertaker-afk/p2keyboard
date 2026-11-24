@@ -1,11 +1,23 @@
 # Phone Keyboard (p2keyboard)
 
 Type on an Android smart board (Newline etc.) from your phone instead of using the board's
-oversized on-screen keyboard. One APK, installed on both devices:
+oversized on-screen keyboard.
 
-- **Board:** registered as an **input method** with no keys. Tapping a text box shows a QR code.
-  A **background service** keeps the link to the phone open all the time: foreground
-  notification, exemption from battery optimization, Wi-Fi lock, and restart after reboot.
+## Downloads
+
+| Install on | APK | |
+| --- | --- | --- |
+| your phone | [`PhoneKeyboard-phone.apk`](https://github.com/Undertaker-afk/p2keyboard/raw/ccr-2711fcaa-kf41p4/dist/PhoneKeyboard-phone.apk) | pairing, scan screen, landscape keyboard |
+| the smart board | [`PhoneKeyboard-board.apk`](https://github.com/Undertaker-afk/p2keyboard/raw/ccr-2711fcaa-kf41p4/dist/PhoneKeyboard-board.apk) | switches keyboards by itself (accessibility service) |
+| the smart board, if Play Protect blocks the one above | [`PhoneKeyboard-board-lite.apk`](https://github.com/Undertaker-afk/p2keyboard/raw/ccr-2711fcaa-kf41p4/dist/PhoneKeyboard-board-lite.apk) | no accessibility service; automatic switching via a one-time adb command |
+
+Google Play Protect blocks sideloaded apps that declare an accessibility service, so the phone
+APK has none, and the board comes in two versions. Each APK only contains its own side:
+
+- **Board:** keeps its normal keyboard. Phone Keyboard (an **input method** with no keys) takes
+  over only while a paired phone is connected. A **background service** keeps the link open:
+  foreground notification, exemption from battery optimization, Wi-Fi lock, restart after
+  reboot, and an on/off switch.
 - **Phone:** opens **locked to landscape, full screen**, with the app's **own on-screen keyboard**,
   drawn by the app rather than using Android's keyboard or a text box. A strip above the keys
   shows what the board's text box holds, live.
@@ -23,12 +35,12 @@ over HTTPS (port 443), which gets through NAT, guest Wi-Fi and school firewalls.
 ## Setup
 
 **Board**
-1. Install `app-release.apk` and open *Phone Keyboard*.
+1. Install `PhoneKeyboard-board.apk` (or `-board-lite`) and open *Phone Keyboard*.
 2. **1. Enable keyboard** → turn on *Phone Keyboard (pair with QR)*. Don't select it: the board
    keeps its normal keyboard, and Phone Keyboard switches in by itself when a phone connects.
 3. **2. Allow background running** → allow notifications and "don't optimize battery".
    On boards with their own app freezer or cleaner, whitelist the app there too.
-4. **3. Allow automatic keyboard switching** → under Accessibility, turn on *Phone Keyboard*
+4. **3. Allow automatic keyboard switching** (board APK) → under Accessibility, turn on *Phone Keyboard*
    (Android 11+). It only switches keyboards and reads nothing on screen. On older Android, or
    instead of that, run once from a computer:
    `adb shell pm grant app.p2keyboard android.permission.WRITE_SECURE_SETTINGS`.
@@ -46,7 +58,7 @@ it back on. On the phone, **Disconnect** (or just leaving the keyboard screen) e
 connection at once.
 
 **Phone**
-1. Install the same APK and open it. The top card shows this phone's name (tap it to rename) and ID.
+1. Install `PhoneKeyboard-phone.apk` and open it. The top card shows this phone's name (tap it to rename) and ID.
 2. **Pair device** → allow the camera → point it at the board's QR code. The QR code is in the
    board's keyboard area when you tap a text box, and on the board's start screen.
    You can also scan with the stock camera: `p2k://` links open the app and pair.
@@ -116,7 +128,8 @@ released last, so the board's apps treat them like a real keyboard.
 ## Build
 
 ```
-./gradlew testDebugUnitTest assembleRelease   # -> app/build/outputs/apk/release/app-release.apk
+./gradlew testPhoneDebugUnitTest testBoardDebugUnitTest testBoardliteDebugUnitTest assembleRelease
+# -> app/build/outputs/apk/{phone,board,boardlite}/release/*.apk
 ```
 
 Needs JDK 17 and the Android SDK (platform 34). The release APK is minified and signed with the

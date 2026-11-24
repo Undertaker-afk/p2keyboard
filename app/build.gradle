@@ -10,8 +10,33 @@ android {
         applicationId 'app.p2keyboard'
         minSdk 26
         targetSdk 34
-        versionCode 6
-        versionName '4.2'
+        versionCode 7
+        versionName '4.3'
+    }
+
+    // One codebase, three APKs. Google Play Protect blocks sideloaded apps that declare an
+    // accessibility service, so only the board build that wants automatic switching has one;
+    // the phone APK never does. Each flavor's manifest removes what that device doesn't use.
+    flavorDimensions = ['role']
+    productFlavors {
+        phone {
+            dimension 'role'
+            buildConfigField 'boolean', 'IS_BOARD', 'false'
+            buildConfigField 'boolean', 'HAS_ACCESSIBILITY', 'false'
+        }
+        board {
+            dimension 'role'
+            buildConfigField 'boolean', 'IS_BOARD', 'true'
+            buildConfigField 'boolean', 'HAS_ACCESSIBILITY', 'true'
+        }
+        boardlite {
+            dimension 'role'
+            buildConfigField 'boolean', 'IS_BOARD', 'true'
+            buildConfigField 'boolean', 'HAS_ACCESSIBILITY', 'false'
+        }
+    }
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {

@@ -37,6 +37,8 @@
     <string name="autoswitch_old_android">Switching: this Android version needs a one-time adb command for automatic switching (see README). Until then you choose Phone Keyboard from the notification.</string>
     <string name="a11y_description">Lets Phone Keyboard switch this board to the phone keyboard when a paired phone connects, and back to the normal keyboard when it leaves. It does not read the screen or anything you type.</string>
     <string name="turn_off">Turn off</string>
+    <string name="autoswitch_lite">Switching: needs a one-time adb command (see README) in this board-lite version. Until then you choose Phone Keyboard from the notification when a phone connects.</string>
+    <string name="board_app_cant_pair">This is the board app. Scan the code with the phone app instead.</string>
     <string name="notif_pick_keyboard">%1$s connected: tap to switch to Phone Keyboard</string>
     <string name="step_enable">1. Enable keyboard</string>
         <string name="step_background">2. Allow background running</string>

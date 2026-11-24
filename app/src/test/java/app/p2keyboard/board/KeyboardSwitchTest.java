@@ -16,12 +16,14 @@ import androidx.test.core.app.ApplicationProvider;
 
 import org.junit.Before;
 import org.junit.Test;
+import static org.junit.Assume.assumeTrue;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
 import java.util.Arrays;
 
+import app.p2keyboard.BuildConfig;
 import app.p2keyboard.board.KeyboardSwitch.Action;
 
 @RunWith(RobolectricTestRunner.class)
@@ -36,6 +38,7 @@ public class KeyboardSwitchTest {
 
     @Before
     public void setUp() {
+        assumeTrue("board APKs only", BuildConfig.IS_BOARD);
         app = ApplicationProvider.getApplicationContext();
         InputMethodManager imm = app.getSystemService(InputMethodManager.class);
         shadowOf(imm).setEnabledInputMethodInfoList(Arrays.asList(

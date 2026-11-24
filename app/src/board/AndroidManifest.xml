@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Board APK: the board keyboard, background link and automatic switching (accessibility). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.CAMERA" tools:node="remove" />
+
+    <application>
+        <activity android:name=".phone.ScanActivity" tools:node="remove" />
+        <activity android:name=".phone.PhoneActivity" tools:node="remove" />
+        <activity android:name="com.journeyapps.barcodescanner.CaptureActivity" tools:node="remove" />
+    </application>
+</manifest>

@@ -97,6 +97,10 @@ public class MainActivity extends Activity {
             BoardLinkService l = BoardLinkService.get();
             if (l != null) l.newCode();
         });
+        // Each APK shows only its own side (see productFlavors in app/build.gradle).
+        findViewById(R.id.phone_section).setVisibility(BuildConfig.IS_BOARD ? View.GONE : View.VISIBLE);
+        findViewById(R.id.board_section).setVisibility(BuildConfig.IS_BOARD ? View.VISIBLE : View.GONE);
+        findViewById(R.id.btn_autoswitch).setVisibility(BuildConfig.HAS_ACCESSIBILITY ? View.VISIBLE : View.GONE);
         handleIntent(getIntent());
     }
 
@@ -110,6 +114,11 @@ public class MainActivity extends Activity {
     /** "Pair device" requests, and board QR codes scanned with the stock camera (p2k://pair?...). */
     private void handleIntent(Intent intent) {
         if (intent == null) return;
+        if (BuildConfig.IS_BOARD && intent.getData() != null) { // a board code scanned on the board itself
+            intent.setData(null);
+            Toast.makeText(this, R.string.board_app_cant_pair, Toast.LENGTH_LONG).show();
+            return;
+        }
         if (ACTION_PAIR.equals(intent.getAction())) {
             intent.setAction(null);
             pairDevice();
@@ -262,7 +271,10 @@ public class MainActivity extends Activity {
     private void refresh() {
         deviceName.setText(Identity.name(this));
         deviceId.setText(getString(R.string.device_id, Identity.deviceId(this)));
-        renderBoards();
+        if (!BuildConfig.IS_BOARD) {
+            renderBoards();
+            return;
+        }
 
         rendering = true;
         boardOn.setChecked(BoardLinkService.isEnabled(this));
@@ -275,6 +287,7 @@ public class MainActivity extends Activity {
         }
         switchStatus.setText(KeyboardSwitch.canWriteSettings(this) ? R.string.autoswitch_adb
                 : KeyboardSwitch.canSwitchAutomatically(this) ? R.string.autoswitch_on
+                : !BuildConfig.HAS_ACCESSIBILITY ? R.string.autoswitch_lite
                 : Build.VERSION.SDK_INT >= 30 ? R.string.autoswitch_off : R.string.autoswitch_old_android);
         PowerManager pm = getSystemService(PowerManager.class);
         boolean unrestricted = pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());

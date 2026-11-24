@@ -17,6 +17,7 @@ import android.widget.LinearLayout;
 import androidx.test.core.app.ApplicationProvider;
 
 import org.junit.Test;
+import static org.junit.Assume.assumeFalse;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
@@ -36,6 +37,11 @@ import app.p2keyboard.phone.ScanActivity;
 @Config(sdk = 34, qualifiers = "w411dp-h1300dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class HomeScreenTest {
+
+    @org.junit.Before
+    public void onlyOnPhone() {
+        assumeFalse("phone APK only", BuildConfig.IS_BOARD);
+    }
 
     private static Pairing board(String name, String secret) {
         return new Pairing(NaclBox.publicKey(NaclBox.newPrivateKey()), "derp4f.tailscale.com", secret, name);
